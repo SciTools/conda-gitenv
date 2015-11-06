@@ -16,6 +16,7 @@ import contextlib
 import logging
 import os
 import shutil
+import tempfile
 
 import conda.resolve
 import conda.api
@@ -48,6 +49,10 @@ def build_manifest_branches(repo_directory):
         if 'manifest/' in name:
             continue
         env.checkout()
+        spec_fname = os.path.join(repo_directory, 'env.spec')
+        if not os.path.exists(spec_fname):
+            # Skip branches which don't have a spec.
+            continue
         index, spec, pkgs = env_check(repo_directory)
         manifest_branch_name = 'manifest/{}'.format(name)
         if manifest_branch_name in r.branches:
@@ -70,10 +75,11 @@ def tempdir(prefix='tmp'):
     try:
         yield tmpdir
     finally:
-        shutil.rmtree(tmpdir)
+        if os.path.isdir(tmpdir):
+            shutil.rmtree(tmpdir)
 
 
-def main()
+def main():
     import argparse
     import tempfile
 

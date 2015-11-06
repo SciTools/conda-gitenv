@@ -1,7 +1,8 @@
 from setuptools import setup
 
 
-setup(name='conda-execute',
+setup(
+      name='conda-env-tracker',
       version='0.1.0',
       description='Track environment specifications using a git repo.',
       author='Phil Elson',
