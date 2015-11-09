@@ -25,47 +25,49 @@ from git import Repo
 import yaml
 
 
-def env_check(repo_dir):
-    fname = os.path.join(repo_dir, 'env.spec')
-    if not os.path.exists(fname):
-        raise IOError("File {} doesn't exist.".format(fname))
-    with open(fname) as fh:
-        spec = yaml.safe_load(fh)
+def resolve_spec(spec_fh):
+    """
+    Given an open file handle to an env.spec, return the package index,
+    the yaml interpretation of the handle, and the list of packages
+    which are resolved from the spec.
+
+    """
+    spec = yaml.safe_load(spec_fh)
     env_spec = spec.get('env', [])
     index = conda.api.get_index(spec.get('channels', []))
-    r = conda.resolve.Resolve(index)
-    full_list_of_packages = sorted(r.solve(env_spec))
+    solver = conda.resolve.Resolve(index)
+    full_list_of_packages = sorted(solver.solve(env_spec))
     return index, spec, full_list_of_packages
 
 
-def build_manifest_branches(repo_directory):
-    r = Repo(repo_directory)
-
-    for remote in r.remotes:
+def build_manifest_branches(repo):
+    for remote in repo.remotes:
         remote.fetch()
 
-    for env in r.branches:
-        name = env.name
-        if 'manifest/' in name:
+    for branch in repo.branches:
+        name = branch.name
+        if name.startswith('manifest/'):
             continue
-        env.checkout()
-        spec_fname = os.path.join(repo_directory, 'env.spec')
+        branch.checkout()
+        spec_fname = os.path.join(repo.working_dir, 'env.spec')
         if not os.path.exists(spec_fname):
             # Skip branches which don't have a spec.
             continue
-        index, spec, pkgs = env_check(repo_directory)
+        with open(spec_fname, 'r') as fh:
+            index, spec, pkgs = resolve_spec(fh)
         manifest_branch_name = 'manifest/{}'.format(name)
-        if manifest_branch_name in r.branches:
-            manifest_branch = r.branches[manifest_branch_name]
+        if manifest_branch_name in repo.branches:
+            manifest_branch = repo.branches[manifest_branch_name]
         else:
-            manifest_branch = r.create_head(manifest_branch_name)
+            manifest_branch = repo.create_head(manifest_branch_name)
         manifest_branch.checkout()
-        manifest_path = os.path.join(repo_directory, 'env.manifest')
+        manifest_path = os.path.join(repo.working_dir, 'env.manifest')
         with open(manifest_path, 'w') as fh:
             fh.write('\n'.join(pkgs))
-        r.index.add([manifest_path])
-        if r.is_dirty():
-            r.index.commit('Manifest update from {:%Y-%m-%d %H:%M:%S}'.format(datetime.datetime.now()))
+        repo.index.add([manifest_path])
+        if repo.is_dirty():
+            repo.index.commit('Manifest update from {:%Y-%m-%d %H:%M:%S}.'
+                              ''.format(datetime.datetime.now()))
 
 
 @contextlib.contextmanager
@@ -81,7 +83,6 @@ def tempdir(prefix='tmp'):
 
 def main():
     import argparse
-    import tempfile
 
     parser = argparse.ArgumentParser(description='Track environment specifications using a git repo.')
     parser.add_argument('repo_uri', help='Repo to use for environment tracking.')
@@ -95,14 +96,17 @@ def main():
 
     with tempdir() as repo_directory:
         repo = Repo.clone_from(args.repo_uri, repo_directory)
+        # Create local tracking branches for each of the remote's branches.
+        # Ignore `HEAD` because it isn't a branch, and ignore the default
+        # remote branch (e.g. `master`) because that will already have a
+        # local tracking branch.
+        heads_to_skip = ['HEAD'] + [branch.name for branch in repo.branches]
         for ref in repo.remotes.origin.refs:
-            # Checkout each of the remote's branches, unless it has already been checked out
-            # or is just HEAD. remote_head is just the name of the branch on the remote
-            # (e.g. if the ref is origin/master, remote_head is just master).
-            if ref.remote_head not in ['HEAD'] + [branch.name for branch in repo.branches]:
-                # Create the branch from the remote branch.
+            if ref.remote_head not in heads_to_skip:
+                # Create the branch from the remote branch, and point it to
+                # track the origin's branch.
                 repo.create_head(ref.remote_head, ref).set_tracking_branch(ref)
-        build_manifest_branches(repo_directory)
+        build_manifest_branches(repo)
         for branch in repo.branches:
             if branch.name.startswith('manifest/'):
                 remote_branch = branch.tracking_branch()

@@ -33,7 +33,7 @@ class Test_full_build(unittest.TestCase):
             channels:
              - defaults 
             """)
-            cli.build_manifest_branches(repo.working_dir)
+            cli.build_manifest_branches(repo)
 
             self.assertIn('manifest/master', repo.branches)
             manifest = repo.branches['manifest/master']
