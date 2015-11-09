@@ -81,6 +81,22 @@ def tempdir(prefix='tmp'):
             shutil.rmtree(tmpdir)
 
 
+def create_tracking_branches(repo):
+    """
+    Create local tracking branches for each of the remote's branches.
+    Ignore `HEAD` because it isn't a branch, and ignore the default
+    remote branch (e.g. `master`) because that will already have a
+    local tracking branch.
+
+    """
+    heads_to_skip = ['HEAD'] + [branch.name for branch in repo.branches]
+    for ref in repo.remotes.origin.refs:
+        if ref.remote_head not in heads_to_skip:
+            # Create the branch from the remote branch, and point it to
+            # track the origin's branch.
+            repo.create_head(ref.remote_head, ref).set_tracking_branch(ref)
+
+
 def main():
     import argparse
 
@@ -96,16 +112,7 @@ def main():
 
     with tempdir() as repo_directory:
         repo = Repo.clone_from(args.repo_uri, repo_directory)
-        # Create local tracking branches for each of the remote's branches.
-        # Ignore `HEAD` because it isn't a branch, and ignore the default
-        # remote branch (e.g. `master`) because that will already have a
-        # local tracking branch.
-        heads_to_skip = ['HEAD'] + [branch.name for branch in repo.branches]
-        for ref in repo.remotes.origin.refs:
-            if ref.remote_head not in heads_to_skip:
-                # Create the branch from the remote branch, and point it to
-                # track the origin's branch.
-                repo.create_head(ref.remote_head, ref).set_tracking_branch(ref)
+        create_tracking_branches(repo)
         build_manifest_branches(repo)
         for branch in repo.branches:
             if branch.name.startswith('manifest/'):
