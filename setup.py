@@ -13,6 +13,7 @@ setup(
           'console_scripts': [
               'conda-env-tracker = conda_env_tracker.cli:main',
               'conda-env-tracker-timestamp = conda_env_tracker.tag_dates:main',
+              'conda-env-tracker-labeltag = conda_env_tracker.label_tag:main',
           ]
       },
      )
