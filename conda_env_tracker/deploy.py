@@ -108,6 +108,11 @@ def deploy_repo(repo, target):
             manifest_branch = repo.branches[manifest_branch_name]
             branch.checkout()
             labelled_tags = tags_by_label(os.path.join(repo.working_dir, 'labels'))
+            # We want to deploy all tags which have a label, as well as the latest tag.
+            if env_tags.get(branch.name):
+                latest_tag = max(env_tags[branch.name],
+                                 key=lambda t: t.commit.committed_date)
+                labelled_tags['latest'] = latest_tag.name
             for tag in set(labelled_tags.values()):
                 deploy_tag(repo, tag, target)
             for label, tag in labelled_tags.items():

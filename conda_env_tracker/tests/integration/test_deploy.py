@@ -57,6 +57,8 @@ class Test(unittest.TestCase):
             self.assertTrue(os.path.exists(link_target('default', 'next')))
             self.assertTrue(os.path.exists(link_target('default', 'current')))
             self.assertTrue(os.path.exists(link_target('bleeding', 'next')))
+            self.assertTrue(os.path.exists(link_target('bleeding', 'latest')))
+            self.assertTrue(os.path.exists(link_target('default', 'latest')))
 
             # Check that we can resolve those links, finding the python executable.
             self.assertTrue(os.path.exists(os.path.join(tmpdir, 'bleeding', 'next', 'bin', 'python')))
