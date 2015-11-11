@@ -15,16 +15,22 @@ from conda_execute.lock import Locked
 manifest_branch_prefix = 'manifest/'
 
 
-def tags_by_label(repo, env_branch):
-    env_branch.checkout()
-    label_dir = os.path.join(repo.working_dir, 'labels')
+def tags_by_label(labels_directory):
     tags = {}
-    if os.path.isdir(label_dir):
-        for label_fname in glob(os.path.join(label_dir, '*.txt')):
+    if os.path.isdir(labels_directory):
+        for label_fname in glob(os.path.join(labels_directory, '*.txt')):
             with open(label_fname, 'r') as fh:
-                tag = fh.read()
+                tag_name = fh.read()
             label = os.path.splitext(os.path.basename(label_fname))[0]
-            tags[label] = tag
+            tags[label] = tag_name
+    return tags
+
+
+def tags_by_env(repo):
+    tags = {}
+    for tag in repo.tags:
+        env_name = tag.name.split('-')[1]
+        tags.setdefault(env_name, []).append(tag)
     return tags
 
 
@@ -34,7 +40,7 @@ def deploy_tag(repo, tag_name, target):
     repo.head.reference = tag.commit
     repo.head.reset(working_tree=True)
 
-    # Pull out the environment name from the form "env_<env_name>_2000_12_25".
+    # Pull out the environment name from the form "env-<env_name>-<deployed_name>".
     env_name = tag_name.split('-')[1]
     deployed_name = tag_name.split('-', 2)[2]
 
@@ -43,7 +49,6 @@ def deploy_tag(repo, tag_name, target):
         raise ValueError("The tag '{}' doesn't have a manifested environment.".format(tag_name))
     with open(manifest_fname, 'r') as fh:
         manifest = sorted(line.strip().split('\t') for line in fh)
-    index = conda.api.get_index()
     create_env(manifest, os.path.join(target, env_name, deployed_name), os.path.join(target, '.pkg_cache'))
 
 
@@ -51,13 +56,22 @@ def create_env(pkgs, target, pkg_cache):
     # We lock the specific environment we are wanting to create. If other requests come in for the
     # exact same environment, they will have to wait for this to finish (good).
     with Locked(target):
+        pkg_names = set(pkg for _, pkg in pkgs)
         if os.path.exists(target):
             # The environment we want to deploy already exists. We should just double check that
             # there aren't already packages in there which we need to remove before we install anything
             # new.
-            for pkg in conda.install.linked(target):
-                if pkg + '.tar.bz2' not in pkgs:
+            linked = conda.install.linked(target)
+            for pkg in linked:
+                if pkg not in pkg_names:
                     conda.install.unlink(target, pkg)
+        else:
+            linked = []
+
+        if set(linked) == pkg_names:
+            # We don't need to re-link everything - it is already as expected.
+            # The downside is that we are not verifying that each package is installed correctly.
+            return
 
         for source, pkg in pkgs:
             index = conda.fetch.fetch_index([source], use_cache=True)
@@ -82,6 +96,7 @@ def create_env(pkgs, target, pkg_cache):
 
 
 def deploy_repo(repo, target):
+    env_tags = tags_by_env(repo)
     for branch in repo.branches:
         # We only want environment branches, not manifest branches.
         if not branch.name.startswith(manifest_branch_prefix):
@@ -91,7 +106,8 @@ def deploy_repo(repo, target):
             if manifest_branch_name not in repo.branches:
                 continue
             manifest_branch = repo.branches[manifest_branch_name]
-            labelled_tags = tags_by_label(repo, branch)
+            branch.checkout()
+            labelled_tags = tags_by_label(os.path.join(repo.working_dir, 'labels'))
             for tag in set(labelled_tags.values()):
                 deploy_tag(repo, tag, target)
             for label, tag in labelled_tags.items():

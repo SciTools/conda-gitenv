@@ -47,6 +47,12 @@ def progress_label(repo, next_tag, next_only=False):
     return env_branch
 
 
+def write_labels(labels_dir, labels):
+    for label, tag in labels.items():
+        label_fname = os.path.join(labels_dir, '{}.txt'.format(label))
+        with open(label_fname, 'w') as fh:
+            fh.write(tag)
+
 def main():
     import argparse
 
