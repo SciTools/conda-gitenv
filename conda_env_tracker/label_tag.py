@@ -11,6 +11,42 @@ from git import Repo
 from conda_env_tracker.cli import tempdir, create_tracking_branches
 
 
+def progress_label(repo, next_tag, next_only=False):
+    # Pull out the environment name from the form "env_<env_name>_2000_12_25".
+    environment_name = next_tag.split('-')[1]
+    env_branch = repo.branches[environment_name]
+    env_branch.checkout()
+    
+    if not next_tag in repo.tags:
+        raise RuntimeError('No tag {!r} exists in the repo.'.format(next_tag))
+
+    labels_dir = os.path.join(repo.working_dir, 'labels')
+    if not os.path.exists(labels_dir):
+        os.makedirs(labels_dir)
+
+    if next_only:
+        label_progression = []
+    else:
+        label_progression = [('previous', None), ('current', 'previous'), ('next', 'current')]
+
+    lbl_fname = lambda label: os.path.join(labels_dir, '{}.txt'.format(label))
+
+    for label, next_label in label_progression:
+        if os.path.exists(lbl_fname(label)):
+            if next_label is None:
+                os.unlink(lbl_fname(label))
+            else:
+                shutil.move(lbl_fname(label), lbl_fname(next_label))
+                repo.index.add([lbl_fname(next_label)])
+
+    with open(lbl_fname('next'), 'w') as fh:
+        fh.write(next_tag)
+
+    repo.index.add([lbl_fname('next')])
+    commit = repo.index.commit('Updated {} label to {}.'.format('next', next_tag))
+    return env_branch
+
+
 def main():
     import argparse
 
@@ -23,38 +59,7 @@ def main():
     with tempdir() as repo_directory:
         repo = Repo.clone_from(args.repo_uri, repo_directory)
         create_tracking_branches(repo)
-        # Pull out the environment name from the form "env_<env_name>_2000_12_25".
-        environment_name = args.next_tag.rsplit('_', 3)[0].split('_', 1)[1]
-        env_branch = repo.branches[environment_name]
-        env_branch.checkout()
-        
-        if not args.next_tag in repo.tags:
-            raise RuntimeError('No tag {!r} exists in the repo.'.format(args.next_tag))
-
-        labels_dir = os.path.join(repo.working_dir, 'labels')
-        if not os.path.exists(labels_dir):
-            os.makedirs(labels_dir)
-
-        if args.next_only:
-            label_progression = []
-        else:
-            label_progression = [('previous', None), ('current', 'previous'), ('next', 'current')]
-
-        lbl_fname = lambda label: os.path.join(labels_dir, '{}.txt'.format(label))
-
-        for label, next_label in label_progression:
-            if os.path.exists(lbl_fname(label)):
-                if next_label is None:
-                    os.unlink(lbl_fname(label))
-                else:
-                    shutil.move(lbl_fname(label), lbl_fname(next_label))
-                    repo.index.add([lbl_fname(next_label)])
-
-        with open(lbl_fname('next'), 'w') as fh:
-            fh.write(args.next_tag)
-
-        repo.index.add([lbl_fname('next')])
-        commit = repo.index.commit('Updated {} label to {}.'.format('next', args.next_tag))
+        env_branch = progress_label(repo, args.next_tag, next_only=args.next_only)
         repo.remotes.origin.push(env_branch)
 
 

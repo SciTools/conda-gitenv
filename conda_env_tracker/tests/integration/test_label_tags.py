@@ -12,10 +12,10 @@ class Test_cli(unittest.TestCase):
     def test(self):
         repo = setup_samples.create_repo('labelled_tags')
 
-        tag1 = 'env_example_env_1971_02_28'
-        tag2 = 'env_example_env_1972_03_31'
-        tag3 = 'env_example_env_1973_05_31'
-        tag4 = 'env_example_env_1974_05_31'
+        tag1 = 'env-example_env-1971_02_28'
+        tag2 = 'env-example_env-1972_03_31'
+        tag3 = 'env-example_env-1973_05_31'
+        tag4 = 'env-example_env-1974_05_31'
 
         branch = repo.create_head('example_env')
         manifest_branch = repo.create_head('manifest/example_env')

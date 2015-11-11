@@ -27,22 +27,28 @@ import yaml
 
 def resolve_spec(spec_fh):
     """
-    Given an open file handle to an env.spec, return the package index,
-    the yaml interpretation of the handle, and the list of packages
-    which are resolved from the spec.
+    Given an open file handle to an env.spec, return a string containing
+    '<channel_url>\t<pkg_name>' for each package resolved.
 
     """
     spec = yaml.safe_load(spec_fh)
     env_spec = spec.get('env', [])
-    index = conda.api.get_index(spec.get('channels', []))
+    index = conda.api.get_index(spec.get('channels', []), use_cache=True)
     solver = conda.resolve.Resolve(index)
-    full_list_of_packages = sorted(solver.solve(env_spec))
-    return index, spec, full_list_of_packages
+    full_list_of_packages = sorted(solver.solve(env_spec), key=lambda pkg: pkg.lower())
+    pkgs = []
+    for pkg in full_list_of_packages:
+        r = index[pkg]
+        pkgs.append('\t'.join([r['channel'], pkg[:-len('.tar.bz2')]])), 
+    return pkgs
 
 
 def build_manifest_branches(repo):
     for remote in repo.remotes:
         remote.fetch()
+
+    # Map channel to a conda index.
+    indices = {}
 
     for branch in repo.branches:
         name = branch.name
@@ -54,7 +60,7 @@ def build_manifest_branches(repo):
             # Skip branches which don't have a spec.
             continue
         with open(spec_fname, 'r') as fh:
-            index, spec, pkgs = resolve_spec(fh)
+            pkgs = resolve_spec(fh)
         manifest_branch_name = 'manifest/{}'.format(name)
         if manifest_branch_name in repo.branches:
             manifest_branch = repo.branches[manifest_branch_name]

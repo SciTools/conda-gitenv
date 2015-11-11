@@ -19,13 +19,17 @@ def create_repo(name):
 
 def add_env(repo, name, spec):
     branch = repo.create_head(name)
+    update_env(repo, branch, spec)
+    return branch
+
+
+def update_env(repo, branch, spec):
     branch.checkout()
     env_spec = os.path.join(repo.working_dir, 'env.spec')
     with open(env_spec, 'w') as fh:
         fh.write(textwrap.dedent(spec))
     repo.index.add([env_spec])
-    repo.index.commit('Add {} spec'.format(name))
-    return branch
+    repo.index.commit('Add {} spec'.format(branch.name))
 
 
 def basic_repo():

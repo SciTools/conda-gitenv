@@ -21,8 +21,13 @@ def tag_by_branch(repo):
             env_name = branch.name[len(manifest_branch_prefix):]
             commit_date = datetime.datetime(*time.gmtime(sha.committed_date)[:6])
             if sha not in repo_tags_by_commit:
-                tag = repo.create_tag('env_{}_{:%Y_%m_%d}'.format(env_name, commit_date), ref=branch,
-                                              message="Automatic tag of {}.".format(env_name))
+                tag_prefix = 'env-{}-{:%Y_%m_%d}'.format(env_name, commit_date)
+                count, proposed_tag = 0, tag_prefix
+                while proposed_tag in repo.tags:
+                    count += 1
+                    proposed_tag = '{}-{}'.format(tag_prefix, count)
+                tag = repo.create_tag(proposed_tag, ref=branch,
+                                      message="Automatic tag of {}.".format(env_name))
                 yield tag
 
 
