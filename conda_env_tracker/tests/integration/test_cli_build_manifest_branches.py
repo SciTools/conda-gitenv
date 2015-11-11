@@ -40,7 +40,7 @@ class Test_full_build(unittest.TestCase):
             manifest.checkout()
             with open(os.path.join(repo.working_dir, 'env.manifest'), 'r') as fh:
                 manifest_contents = fh.readlines()
-            pkg_names = [pkg.split('-', 1)[0] for pkg in manifest_contents]
+            pkg_names = [pkg.split('\t', 1)[1].split('-')[0] for pkg in manifest_contents]
             self.assertIn('python', pkg_names)
             self.assertIn('zlib', pkg_names)
 

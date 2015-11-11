@@ -24,20 +24,25 @@ import conda_execute.config
 from git import Repo
 import yaml
 
+from conda_env_tracker import manifest_branch_prefix
+
 
 def resolve_spec(spec_fh):
     """
-    Given an open file handle to an env.spec, return the package index,
-    the yaml interpretation of the handle, and the list of packages
-    which are resolved from the spec.
+    Given an open file handle to an env.spec, return a list of strings containing
+    '<channel_url>\t<pkg_name>' for each package resolved.
 
     """
     spec = yaml.safe_load(spec_fh)
     env_spec = spec.get('env', [])
-    index = conda.api.get_index(spec.get('channels', []))
+    index = conda.api.get_index(spec.get('channels', []), use_cache=True)
     solver = conda.resolve.Resolve(index)
-    full_list_of_packages = sorted(solver.solve(env_spec))
-    return index, spec, full_list_of_packages
+    full_list_of_packages = sorted(solver.solve(env_spec), key=lambda pkg: pkg.lower())
+    pkgs = []
+    for pkg in full_list_of_packages:
+        r = index[pkg]
+        pkgs.append('\t'.join([r['channel'], pkg[:-len('.tar.bz2')]])), 
+    return pkgs
 
 
 def build_manifest_branches(repo):
@@ -46,7 +51,7 @@ def build_manifest_branches(repo):
 
     for branch in repo.branches:
         name = branch.name
-        if name.startswith('manifest/'):
+        if name.startswith(manifest_branch_prefix):
             continue
         branch.checkout()
         spec_fname = os.path.join(repo.working_dir, 'env.spec')
@@ -54,8 +59,8 @@ def build_manifest_branches(repo):
             # Skip branches which don't have a spec.
             continue
         with open(spec_fname, 'r') as fh:
-            index, spec, pkgs = resolve_spec(fh)
-        manifest_branch_name = 'manifest/{}'.format(name)
+            pkgs = resolve_spec(fh)
+        manifest_branch_name = '{}{}'.format(manifest_branch_prefix, name)
         if manifest_branch_name in repo.branches:
             manifest_branch = repo.branches[manifest_branch_name]
         else:
@@ -81,6 +86,22 @@ def tempdir(prefix='tmp'):
             shutil.rmtree(tmpdir)
 
 
+def create_tracking_branches(repo):
+    """
+    Create local tracking branches for each of the remote's branches.
+    Ignore `HEAD` because it isn't a branch, and ignore the default
+    remote branch (e.g. `master`) because that will already have a
+    local tracking branch.
+
+    """
+    heads_to_skip = ['HEAD'] + [branch.name for branch in repo.branches]
+    for ref in repo.remotes.origin.refs:
+        if ref.remote_head not in heads_to_skip:
+            # Create the branch from the remote branch, and point it to
+            # track the origin's branch.
+            repo.create_head(ref.remote_head, ref).set_tracking_branch(ref)
+
+
 def main():
     import argparse
 
@@ -96,19 +117,10 @@ def main():
 
     with tempdir() as repo_directory:
         repo = Repo.clone_from(args.repo_uri, repo_directory)
-        # Create local tracking branches for each of the remote's branches.
-        # Ignore `HEAD` because it isn't a branch, and ignore the default
-        # remote branch (e.g. `master`) because that will already have a
-        # local tracking branch.
-        heads_to_skip = ['HEAD'] + [branch.name for branch in repo.branches]
-        for ref in repo.remotes.origin.refs:
-            if ref.remote_head not in heads_to_skip:
-                # Create the branch from the remote branch, and point it to
-                # track the origin's branch.
-                repo.create_head(ref.remote_head, ref).set_tracking_branch(ref)
+        create_tracking_branches(repo)
         build_manifest_branches(repo)
         for branch in repo.branches:
-            if branch.name.startswith('manifest/'):
+            if branch.name.startswith(manifest_branch_prefix):
                 remote_branch = branch.tracking_branch()
                 if remote_branch is None or branch.commit != remote_branch.commit:
                     print('Pushing changes to {}'.format(branch.name))
