@@ -12,7 +12,7 @@ import conda.fetch
 from conda_env_tracker.cli import tempdir, create_tracking_branches
 from conda_execute.lock import Locked
 
-manifest_branch_prefix = 'manifest/'
+from conda_env_tracker import manifest_branch_prefix
 
 
 def tags_by_label(labels_directory):

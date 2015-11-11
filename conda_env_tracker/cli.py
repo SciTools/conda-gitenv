@@ -24,10 +24,12 @@ import conda_execute.config
 from git import Repo
 import yaml
 
+from conda_env_tracker import manifest_branch_prefix
+
 
 def resolve_spec(spec_fh):
     """
-    Given an open file handle to an env.spec, return a string containing
+    Given an open file handle to an env.spec, return a list of strings containing
     '<channel_url>\t<pkg_name>' for each package resolved.
 
     """
@@ -47,12 +49,9 @@ def build_manifest_branches(repo):
     for remote in repo.remotes:
         remote.fetch()
 
-    # Map channel to a conda index.
-    indices = {}
-
     for branch in repo.branches:
         name = branch.name
-        if name.startswith('manifest/'):
+        if name.startswith(manifest_branch_prefix):
             continue
         branch.checkout()
         spec_fname = os.path.join(repo.working_dir, 'env.spec')
@@ -61,7 +60,7 @@ def build_manifest_branches(repo):
             continue
         with open(spec_fname, 'r') as fh:
             pkgs = resolve_spec(fh)
-        manifest_branch_name = 'manifest/{}'.format(name)
+        manifest_branch_name = '{}{}'.format(manifest_branch_prefix, name)
         if manifest_branch_name in repo.branches:
             manifest_branch = repo.branches[manifest_branch_name]
         else:
@@ -121,7 +120,7 @@ def main():
         create_tracking_branches(repo)
         build_manifest_branches(repo)
         for branch in repo.branches:
-            if branch.name.startswith('manifest/'):
+            if branch.name.startswith(manifest_branch_prefix):
                 remote_branch = branch.tracking_branch()
                 if remote_branch is None or branch.commit != remote_branch.commit:
                     print('Pushing changes to {}'.format(branch.name))
