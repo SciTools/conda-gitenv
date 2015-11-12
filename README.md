@@ -30,7 +30,7 @@ git commit -m "Added the default environment."
 
 ```
 
-The update process can be broken into multiple phases, any/all of which can potenitally be fully automated.
+The update process can be broken into multiple phases, any/all of which can potentially be fully automated.
 
 
 Phase 1: Resolve the environment (manifestication)
@@ -213,13 +213,27 @@ Python 2.7.10
 Phase 4: More labels (labeltag)
 ===============================
 
-As environments evolve it is desirable to be able to label environments of value.
+As environments evolve it is desirable to be able to label those of value.
 
-*TODO*: Write this seciton.
+As we have already seen, the "latest" label is automatically added to point to the
+tag which points to the most recent commit. Labelled environments are implemented as
+symlinks which point to the appropriate tag at deploy time.
+
+It is possible to add other labels which point to tagged environments:
+
+
+ 
+
+*TODO*: Finish this seciton.
 
 
 
 Notes
 -----
 
-If using ``conda-env-tracker`` on a local git repository, it will not be possible to push changes to a branch which is checked out. In these situations it is safest to put your local repo into "detached head" mode (one option ``git checkout --detach``).
+* If using ``conda-env-tracker`` on a local git repository, it will not be possible to push changes to a branch which is checked out. In these situations it is safest to put your local repo into "detached head" mode (one option ``git checkout --detach``).
+
+* Assumes a basic approach of merge and fix, rather than verify before merge. To mitigate this concern, the labels concept allows us to point to a tagand would not break if we merged something erroneously.
+
+
+
