@@ -239,9 +239,11 @@ likely to change in the future. Please raise an issue if you would like more det
 Notes
 -----
 
-* If using ``conda-env-tracker`` on a local git repository, it will not be possible to push changes to a branch which is checked out. In these situations it is safest to put your local repo into "detached head" mode (one option ``git checkout --detach``).
+* If using ``conda-env-tracker`` on a local git repository, it will not be possible to push changes to a branch which is checked out.
+  In these situations it is safest to put your local repo into "detached head" mode (one option ``git checkout --detach``).
 
-* Assumes a basic approach of merge and fix, rather than verify before merge. To mitigate this concern, the labels concept allows us to point to a tagand would not break if we merged something erroneously.
+* Assumes a basic approach of merge and fix, rather than verify before merge. To mitigate this concern, the labels concept allows
+  us to point to a tag, which would not break if we merged something erroneously.
 
 
 
