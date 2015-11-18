@@ -20,7 +20,7 @@ def tags_by_label(labels_directory):
     if os.path.isdir(labels_directory):
         for label_fname in glob(os.path.join(labels_directory, '*.txt')):
             with open(label_fname, 'r') as fh:
-                tag_name = fh.read()
+                tag_name = fh.read().strip()
             label = os.path.splitext(os.path.basename(label_fname))[0]
             tags[label] = tag_name
     return tags

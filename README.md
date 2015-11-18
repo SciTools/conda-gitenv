@@ -219,14 +219,22 @@ As we have already seen, the "latest" label is automatically added to point to t
 tag which points to the most recent commit. Labelled environments are implemented as
 symlinks which point to the appropriate tag at deploy time.
 
-It is possible to add other labels which point to tagged environments:
+It is possible to add other labels which point to tagged environments. Labels are currently
+defined in the environment definition branch, under a directory called labels. For instance, to
+add a "pre-prod" label to our default environment definition:
 
+```
+git checkout default
+mkdir labels
+echo "env-default-2015_11_12-1" > labels/pre-prod.txt
+git add labels
+git commit -am "Added a pre-prod label."
+```
 
- 
+Re-running the deployment will see a new symbolic linked environment, pointing to the appropriate tag.
 
-*TODO*: Finish this seciton.
-
-
+There is some machinery which helps us move through a next -> current -> previous workflow, but this is
+likely to change in the future. Please raise an issue if you would like more detail on this.
 
 Notes
 -----
