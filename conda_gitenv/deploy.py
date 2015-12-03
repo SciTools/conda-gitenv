@@ -10,8 +10,8 @@ from git import Repo
 import conda.api
 import conda.fetch
 from conda_gitenv.resolve import tempdir, create_tracking_branches
-from conda_execute.lock import Locked
 
+from conda_gitenv.lock import Locked
 from conda_gitenv import manifest_branch_prefix
 
 

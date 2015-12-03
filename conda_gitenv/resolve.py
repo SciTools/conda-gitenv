@@ -3,10 +3,9 @@
 # conda execute
 # env:
 #  - gitpython
-#  - conda-execute
+#  - conda-build-all
 #  - yaml
 # channels:
-#  - minadyn
 #  - conda-forge
 
 from __future__ import print_function
