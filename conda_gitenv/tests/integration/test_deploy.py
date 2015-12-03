@@ -11,7 +11,6 @@ from conda_gitenv.tests.integration.setup_samples import (create_repo, add_env,
 
 class Test(unittest.TestCase):
     def setUp(self):
-        # Creates a new repo which is updated by conda-env-tracker
         repo = create_repo('deployable_2_envs')
         default = add_env(repo, 'default', """
             env:

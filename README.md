@@ -1,7 +1,7 @@
 Track environment specifications using a git repo
 -------------------------------------------------
 
-``conda-env-tracker`` is a designed to simplify the deployment centrally managed conda environments.
+``conda gitenv`` is a designed to simplify the deployment centrally managed conda environments.
 Rather than expecting a sysadimn to administer appropriate conda commands on a live system, it decouples
 the ``conda update`` phase from the actual deployment, giving users the ability to review and prepare for
 any forthcoming changes.
@@ -39,7 +39,7 @@ Phase 1: Resolve the environment (manifestication)
 First, we resolve the ``env.spec`` from each of the branches in the repo (in this case, we just have a branch named ``default``). 
 
 ```
-$ conda-env-tracker ${ENV_REPO}
+$ conda gitenv resolve ${ENV_REPO}
 Pushing changes to manifest/default
 ```
 
@@ -71,12 +71,12 @@ Phase 2: Tag the manifest branches (timestamp)
 ==============================================
 
 Once we are happy with the ``env.manifest``, it is time to tag the environment.
-We can choose to automate the process using ``conda-env-tracker-timestamp``, which simply tags the head of each
+We can choose to automate the process using ``conda gitenv autotag``, which simply tags the head of each
 environment (aka. branch) based on the last commit date.
 
 
 ```
-$ conda-env-tracker-timestamp ${ENV_REPO}
+$ conda gitenv autotag ${ENV_REPO}
 Pushing tag env-default-2015_11_12
 ```
 
@@ -89,7 +89,7 @@ With the repo in this form we have a single environment (named "default") with a
 There is now sufficient information to deploy the repository of environments:
 
 ```
-$ conda-env-tracker-deploy ${ENV_REPO} /path/to/install/environments
+$ conda gitenv deploy ${ENV_REPO} /path/to/install/environments
 Fetching package metadata: .
 Fetching openssl-1.0.2d-0
 Fetching pip-7.1.2-py35_0
@@ -159,7 +159,7 @@ $ git commit -m "Created a 'legacy' environment for py2k."
 We can now resolve our ``env.spec`` definitions (phase 1):
 
 ```
-$ conda-env-tracker ${ENV_REPO}
+$ conda gitenv resolve ${ENV_REPO}
 Pushing changes to manifest/default
 Pushing changes to manifest/legacy
 ```
@@ -167,7 +167,7 @@ Pushing changes to manifest/legacy
 Tag the newly resolved environments (phase 2):
 
 ```
-$ conda-env-tracker-timestamp ${ENV_REPO}
+$ conda gitenv autotag ${ENV_REPO}
 Pushing tag env-default-2015_11_12-1
 Pushing tag env-legacy-2015_11_12
 ```
@@ -175,7 +175,7 @@ Pushing tag env-legacy-2015_11_12
 And deploy (phase 3):
 
 ```
-$ conda-env-tracker-deploy ${ENV_REPO} /path/to/install/environments
+$ conda gitenv deploy ${ENV_REPO} /path/to/install/environments
 Fetching package metadata: .
 Fetching libgfortran-1.0-0
 Fetching numpy-1.10.1-py35_0
@@ -239,7 +239,7 @@ likely to change in the future. Please raise an issue if you would like more det
 Notes
 -----
 
-* If using ``conda-env-tracker`` on a local git repository, it will not be possible to push changes to a branch which is checked out.
+* If using ``conda gitenv`` on a local git repository, it will not be possible to push changes to a branch which is checked out.
   In these situations it is safest to put your local repo into "detached head" mode (one option ``git checkout --detach``).
 
 * Assumes a basic approach of merge and fix, rather than verify before merge. To mitigate this concern, the labels concept allows

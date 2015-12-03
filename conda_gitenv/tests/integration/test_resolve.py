@@ -11,7 +11,7 @@ class Test_full_build(unittest.TestCase):
     def test_basic_env(self):
         repo = setup_samples.basic_repo()
         self.assertNotIn('manifest/master', repo.branches)
-        check_call(['conda-env-tracker', repo.working_dir])
+        check_call(['conda', 'gitenv', 'resolve', repo.working_dir])
         self.assertIn('manifest/master', repo.branches)
         manifest_branch = repo.branches['manifest/master']
         manifest_branch.checkout()

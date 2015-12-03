@@ -10,14 +10,11 @@ setup(
       author='Phil Elson',
       author_email='pelson.pub@gmail.com',
       url='https://github.com/scitools/conda-gitenv',
-      packages=['conda_gitenv'],
+      packages=['conda_gitenv', 'conda_gitenv.tests',
+                'conda_gitenv.tests.unit', 'conda_gitenv.tests.integration'],
       entry_points={
           'console_scripts': [
               'conda-gitenv = conda_gitenv.cli:main',
-              'conda-env-tracker = conda_gitenv.resolve:main',
-              'conda-env-tracker-timestamp = conda_gitenv.tag_dates:main',
-              'conda-env-tracker-labeltag = conda_gitenv.label_tag:main',
-              'conda-env-tracker-deploy = conda_gitenv.deploy:main',
           ]
       },
      )
