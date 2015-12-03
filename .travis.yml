@@ -11,7 +11,6 @@ env:
     matrix:
         - PYTHON=2.7
         - PYTHON=3.4
-        - PYTHON=3.5
 
 install:
     - mkdir -p ${HOME}/cache/pkgs
@@ -20,6 +19,9 @@ install:
 
     # Re-use the pacakges in the cache, and download any new ones into that location.
     - rm -rf ${CONDA_INSTALL_LOCN}/pkgs && ln -s ${HOME}/cache/pkgs ${CONDA_INSTALL_LOCN}/pkgs
+
+    - git config --global user.name "Travis user"
+    - git config --global user.email travis-tests@example.com
 
     # Now do the things we need to do to install it.
     - conda install --file requirements.txt nose mock python=${PYTHON} --yes --quiet -c conda-forge

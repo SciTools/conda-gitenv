@@ -5,7 +5,8 @@ import unittest
 
 from git import Repo
 from conda_gitenv import resolve, tag_dates, label_tag, deploy
-from setup_samples import create_repo, add_env, update_env
+from conda_gitenv.tests.integration.setup_samples import (create_repo, add_env,
+                                                          update_env)
 
 
 class Test(unittest.TestCase):

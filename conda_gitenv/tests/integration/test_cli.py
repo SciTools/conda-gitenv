@@ -4,7 +4,7 @@ import textwrap
 import unittest
 from subprocess import check_call
 
-import setup_samples
+import conda_gitenv.tests.integration.setup_samples as setup_samples
 
 
 class Test_full_build(unittest.TestCase):
