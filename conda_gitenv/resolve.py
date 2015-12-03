@@ -3,10 +3,9 @@
 # conda execute
 # env:
 #  - gitpython
-#  - conda-execute
+#  - conda-build-all
 #  - yaml
 # channels:
-#  - minadyn
 #  - conda-forge
 
 from __future__ import print_function
@@ -20,7 +19,7 @@ import tempfile
 
 import conda.resolve
 import conda.api
-import conda_execute.config
+import conda_build_all.version_matrix
 from git import Repo
 import yaml
 
@@ -35,7 +34,7 @@ def resolve_spec(spec_fh):
     """
     spec = yaml.safe_load(spec_fh)
     env_spec = spec.get('env', [])
-    index = conda.api.get_index(spec.get('channels', []), use_cache=True)
+    index = conda.api.get_index(spec.get('channels', []), prepend=False, use_cache=False)
     solver = conda.resolve.Resolve(index)
     full_list_of_packages = sorted(solver.solve(env_spec), key=lambda pkg: pkg.lower())
     pkgs = []
@@ -113,18 +112,17 @@ def handle_args(args):
     log_level = logging.WARN
     if args.verbose:
         log_level = logging.DEBUG
-    conda_execute.config.setup_logging(log_level)
-
-    with tempdir() as repo_directory:
-        repo = Repo.clone_from(args.repo_uri, repo_directory)
-        create_tracking_branches(repo)
-        build_manifest_branches(repo)
-        for branch in repo.branches:
-            if branch.name.startswith(manifest_branch_prefix):
-                remote_branch = branch.tracking_branch()
-                if remote_branch is None or branch.commit != remote_branch.commit:
-                    print('Pushing changes to {}'.format(branch.name))
-                    repo.remotes.origin.push(branch)
+    with conda_build_all.version_matrix.override_conda_logging(log_level):
+        with tempdir() as repo_directory:
+            repo = Repo.clone_from(args.repo_uri, repo_directory)
+            create_tracking_branches(repo)
+            build_manifest_branches(repo)
+            for branch in repo.branches:
+                if branch.name.startswith(manifest_branch_prefix):
+                    remote_branch = branch.tracking_branch()
+                    if remote_branch is None or branch.commit != remote_branch.commit:
+                        print('Pushing changes to {}'.format(branch.name))
+                        repo.remotes.origin.push(branch)
 
 
 def main():
