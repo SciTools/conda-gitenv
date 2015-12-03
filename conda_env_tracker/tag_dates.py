@@ -5,7 +5,7 @@ import datetime
 import time
 
 from git import Repo
-from conda_env_tracker.cli import tempdir, create_tracking_branches
+from conda_env_tracker.resolve import tempdir, create_tracking_branches
 
 
 manifest_branch_prefix = 'manifest/'
@@ -31,19 +31,28 @@ def tag_by_branch(repo):
                 yield tag
 
 
-def main():
-    import argparse
-
-    parser = argparse.ArgumentParser(description='Tag manifested environments based on the commit timestamp.')
+def configure_parser(parser):
     parser.add_argument('repo_uri', help='Repo to push tags to.')
-    args = parser.parse_args()
+    parser.set_defaults(function=handle_args)
+    return parser
 
+
+def handle_args(args):
     with tempdir() as repo_directory:
         repo = Repo.clone_from(args.repo_uri, repo_directory)
         create_tracking_branches(repo)
         for tag in tag_by_branch(repo):
             print('Pushing tag {}'.format(tag.name))
             repo.remotes.origin.push(tag)
+
+
+def main():
+    import argparse
+
+    parser = argparse.ArgumentParser(description='Tag manifested environments based on the commit timestamp.')
+    configure_parser(parser)
+    args = parser.parse_args()
+    args.function(args)
 
 
 if __name__ == '__main__':

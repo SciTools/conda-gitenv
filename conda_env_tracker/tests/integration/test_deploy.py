@@ -4,7 +4,7 @@ import textwrap
 import unittest
 
 from git import Repo
-from conda_env_tracker import cli, tag_dates, label_tag, deploy
+from conda_env_tracker import resolve, tag_dates, label_tag, deploy
 from setup_samples import create_repo, add_env, update_env
 
 
@@ -18,7 +18,7 @@ class Test(unittest.TestCase):
             channels:
              - defaults 
             """)
-        cli.build_manifest_branches(repo)
+        resolve.build_manifest_branches(repo)
 
         bleeding = add_env(repo, 'bleeding', """
             env:
@@ -27,7 +27,7 @@ class Test(unittest.TestCase):
             channels:
              - defaults 
             """)
-        cli.build_manifest_branches(repo)
+        resolve.build_manifest_branches(repo)
         for tag in tag_dates.tag_by_branch(repo):
             label_tag.progress_label(repo, tag.name)
 
@@ -37,7 +37,7 @@ class Test(unittest.TestCase):
             channels: 
              - defaults 
             """)
-        cli.build_manifest_branches(repo)
+        resolve.build_manifest_branches(repo)
         for tag in tag_dates.tag_by_branch(repo):
             self.default_next_tag = tag.name
             label_tag.progress_label(repo, tag.name)
@@ -45,8 +45,7 @@ class Test(unittest.TestCase):
         self.repo = repo
 
     def test(self):
-        with cli.tempdir() as tmpdir:
-            tmpdir = '/downloads/foobar'
+        with resolve.tempdir() as tmpdir:
             deploy.deploy_repo(self.repo, tmpdir)
 
             def link_target(env, label):

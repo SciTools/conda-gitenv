@@ -9,7 +9,7 @@ import time
 from git import Repo
 import conda.api
 import conda.fetch
-from conda_env_tracker.cli import tempdir, create_tracking_branches
+from conda_env_tracker.resolve import tempdir, create_tracking_branches
 from conda_execute.lock import Locked
 
 from conda_env_tracker import manifest_branch_prefix
@@ -130,19 +130,27 @@ def deploy_repo(repo, target):
                         print('Linking {}/{} to {}'.format(branch.name, label, tag))
                         os.symlink(label_target, label_location)
 
+def configure_parser(parser):
+    parser.add_argument('repo_uri', help='Repo to deploy.')
+    parser.add_argument('target', help='Location to deploy the environments to.')
+    parser.set_defaults(function=handle_args)
+    return parser
+
+
+def handle_args(args):
+    with tempdir() as repo_directory:
+        repo = Repo.clone_from(args.repo_uri, repo_directory)
+        create_tracking_branches(repo)
+        deploy_repo(repo, args.target)
+
 
 def main():
     import argparse
 
     parser = argparse.ArgumentParser(description='Deploy the tracked environments.')
-    parser.add_argument('repo_uri', help='Repo to deploy.')
-    parser.add_argument('target', help='Location to deploy the environments to.')
+    configure_parser(parser)
     args = parser.parse_args()
-
-    with tempdir() as repo_directory:
-        repo = Repo.clone_from(args.repo_uri, repo_directory)
-        create_tracking_branches(repo)
-        deploy_repo(repo, args.target)
+    return args.function(args)
 
 
 if __name__ == '__main__':

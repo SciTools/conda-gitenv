@@ -8,7 +8,7 @@ import shutil
 import time
 
 from git import Repo
-from conda_env_tracker.cli import tempdir, create_tracking_branches
+from conda_env_tracker.resolve import tempdir, create_tracking_branches
 
 
 def progress_label(repo, next_tag, next_only=False):
@@ -53,20 +53,30 @@ def write_labels(labels_dir, labels):
         with open(label_fname, 'w') as fh:
             fh.write(tag)
 
-def main():
-    import argparse
 
-    parser = argparse.ArgumentParser(description='Update the next, current and previous labels of the given managed environment.')
+def configure_parser(parser):
     parser.add_argument('repo_uri', help='The repo to push the labels to.')
     parser.add_argument('next_tag', help='The tag to use for "next". The environment is deduced from that in the tag name.')
     parser.add_argument('--next-only', help='Whether to only update "next" and not current & previous.', action='store_true')
-    args = parser.parse_args()
+    parser.set_defaults(function=handle_args)
+    return parser
 
+
+def handle_args(args):
     with tempdir() as repo_directory:
         repo = Repo.clone_from(args.repo_uri, repo_directory)
         create_tracking_branches(repo)
         env_branch = progress_label(repo, args.next_tag, next_only=args.next_only)
         repo.remotes.origin.push(env_branch)
+
+
+def main():
+    import argparse
+
+    parser = argparse.ArgumentParser(description='Update the next, current and previous labels of the given managed environment.')
+    configure_parser(parser)
+    args = parser.parse_args()
+    return args.function(args)
 
 
 if __name__ == '__main__':
