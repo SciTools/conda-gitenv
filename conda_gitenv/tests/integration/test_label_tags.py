@@ -30,7 +30,7 @@ class Test_cli(unittest.TestCase):
         self.assertFalse(os.path.exists(labels_dir))
         # Checkout a different branch so that we can checkout the changes later on.
         manifest_branch.checkout()
-        check_call(['conda-env-tracker-labeltag', repo.working_dir, tag1])
+        check_call(['conda', 'gitenv', 'autolabel', repo.working_dir, tag1])
 
         branch.checkout()
         self.assertTrue(os.path.exists(labels_dir))
@@ -44,7 +44,7 @@ class Test_cli(unittest.TestCase):
         # Now add another tag, and move it through the process.
         repo.create_tag(tag2, manifest_branch)
         manifest_branch.checkout()
-        check_call(['conda-env-tracker-labeltag', repo.working_dir, tag2])
+        check_call(['conda', 'gitenv', 'autolabel', repo.working_dir, tag2])
 
         branch.checkout()
         with open(next_fname, 'r') as fh:
@@ -58,7 +58,7 @@ class Test_cli(unittest.TestCase):
         # Now add another tag, but only update the "next" label..
         repo.create_tag(tag3, manifest_branch)
         manifest_branch.checkout()
-        check_call(['conda-env-tracker-labeltag', repo.working_dir, tag3, '--next-only'])
+        check_call(['conda', 'gitenv', 'autolabel', repo.working_dir, tag3, '--next-only'])
 
         branch.checkout()
         with open(next_fname, 'r') as fh:
@@ -72,7 +72,7 @@ class Test_cli(unittest.TestCase):
         # Now add another tag, and move it through the process.
         repo.create_tag(tag4, manifest_branch)
         manifest_branch.checkout()
-        check_call(['conda-env-tracker-labeltag', repo.working_dir, tag4])
+        check_call(['conda', 'gitenv', 'autolabel', repo.working_dir, tag4])
 
         branch.checkout()
         with open(next_fname, 'r') as fh:

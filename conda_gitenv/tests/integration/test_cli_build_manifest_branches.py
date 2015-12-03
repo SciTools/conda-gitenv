@@ -25,7 +25,6 @@ class Test_full_build(unittest.TestCase):
         repo.index.commit('Add {} spec'.format(name))
 
     def test_single_env(self):
-        # Creates a new repo which is updated by conda-env-tracker
         with self.create_repo() as repo:
             self.add_env(repo, 'master', """
             env:

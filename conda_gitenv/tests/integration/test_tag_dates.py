@@ -22,7 +22,7 @@ class Test_cli(unittest.TestCase):
         repo = setup_samples.create_repo('tag_by_date')
         env = repo.create_head('manifest/example_env')
                  
-        check_call(['conda-env-tracker-timestamp', repo.working_dir])
+        check_call(['conda', 'gitenv', 'autotag', repo.working_dir])
 
         self.assertEqual(repo.tags[0].commit, env.commit)
 
