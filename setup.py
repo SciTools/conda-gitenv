@@ -1,9 +1,11 @@
 from setuptools import setup
+import versioneer
 
 
 setup(
       name='conda-gitenv',
-      version='0.1.0',
+      version=versioneer.get_version(),
+      cmdclass=versioneer.get_cmdclass(),
       description='Track environment specifications using a git repo.',
       author='Phil Elson',
       author_email='pelson.pub@gmail.com',
