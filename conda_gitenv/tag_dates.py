@@ -5,7 +5,7 @@ import datetime
 import time
 
 from git import Repo
-from conda_env_tracker.resolve import tempdir, create_tracking_branches
+from conda_gitenv.resolve import tempdir, create_tracking_branches
 
 
 manifest_branch_prefix = 'manifest/'

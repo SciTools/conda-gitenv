@@ -3,10 +3,10 @@
 from __future__ import print_function
 import argparse
 
-import conda_env_tracker.resolve as resolve
-import conda_env_tracker.tag_dates as tag_dates
-import conda_env_tracker.label_tag as label_tag
-import conda_env_tracker.deploy as deploy
+import conda_gitenv.resolve as resolve
+import conda_gitenv.tag_dates as tag_dates
+import conda_gitenv.label_tag as label_tag
+import conda_gitenv.deploy as deploy
 
     
 def main():

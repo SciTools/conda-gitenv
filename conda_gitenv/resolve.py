@@ -24,7 +24,7 @@ import conda_execute.config
 from git import Repo
 import yaml
 
-from conda_env_tracker import manifest_branch_prefix
+from conda_gitenv import manifest_branch_prefix
 
 
 def resolve_spec(spec_fh):

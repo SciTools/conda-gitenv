@@ -4,8 +4,8 @@ import textwrap
 import unittest
 
 from git import Repo
-from conda_env_tracker import resolve, tag_dates, label_tag, deploy
-from conda_env_tracker.tests.integration.setup_samples import create_repo
+from conda_gitenv import resolve, tag_dates, label_tag, deploy
+from conda_gitenv.tests.integration.setup_samples import create_repo
 
 
 class Test_tags_by_env(unittest.TestCase):

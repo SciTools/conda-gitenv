@@ -4,7 +4,7 @@ import textwrap
 import unittest
 
 from git import Repo
-from conda_env_tracker import resolve
+from conda_gitenv import resolve
 
 
 class Test_full_build(unittest.TestCase):
