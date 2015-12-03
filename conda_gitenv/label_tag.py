@@ -2,7 +2,6 @@
 from __future__ import print_function
 
 import datetime
-from itertools import izip_longest
 import os
 import shutil
 import time
