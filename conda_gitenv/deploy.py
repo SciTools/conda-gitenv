@@ -9,10 +9,10 @@ import time
 from git import Repo
 import conda.api
 import conda.fetch
-from conda_env_tracker.resolve import tempdir, create_tracking_branches
+from conda_gitenv.resolve import tempdir, create_tracking_branches
 from conda_execute.lock import Locked
 
-from conda_env_tracker import manifest_branch_prefix
+from conda_gitenv import manifest_branch_prefix
 
 
 def tags_by_label(labels_directory):

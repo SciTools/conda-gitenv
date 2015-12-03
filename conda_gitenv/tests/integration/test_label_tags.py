@@ -5,7 +5,7 @@ import unittest
 from subprocess import check_call
 
 import setup_samples
-from conda_env_tracker.tag_dates import tag_by_branch
+from conda_gitenv.tag_dates import tag_by_branch
 
 
 class Test_cli(unittest.TestCase):
