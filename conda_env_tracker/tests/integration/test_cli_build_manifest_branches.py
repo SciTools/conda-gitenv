@@ -4,13 +4,13 @@ import textwrap
 import unittest
 
 from git import Repo
-from conda_env_tracker import cli
+from conda_env_tracker import resolve
 
 
 class Test_full_build(unittest.TestCase):
     @contextlib.contextmanager
     def create_repo(self):
-        with cli.tempdir() as tmpdir:
+        with resolve.tempdir() as tmpdir:
             repo = Repo.init(tmpdir)
             repo.index.commit('Initial commit.')
             yield repo
@@ -33,7 +33,7 @@ class Test_full_build(unittest.TestCase):
             channels:
              - defaults 
             """)
-            cli.build_manifest_branches(repo)
+            resolve.build_manifest_branches(repo)
 
             self.assertIn('manifest/master', repo.branches)
             manifest = repo.branches['manifest/master']

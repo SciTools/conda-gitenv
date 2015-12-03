@@ -4,7 +4,7 @@ import textwrap
 import unittest
 
 from git import Repo
-from conda_env_tracker import cli, tag_dates, label_tag, deploy
+from conda_env_tracker import resolve, tag_dates, label_tag, deploy
 from conda_env_tracker.tests.integration.setup_samples import create_repo
 
 
@@ -39,14 +39,14 @@ class Test_tags_by_env(unittest.TestCase):
 class Test_tags_by_label(unittest.TestCase):
     def test_no_tags(self):
         expected = {}
-        with cli.tempdir() as labels_dir:
+        with resolve.tempdir() as labels_dir:
             label_tag.write_labels(labels_dir, expected)
             result = deploy.tags_by_label(labels_dir)
         self.assertEqual(result, expected)
 
     def test_some(self):
         expected = {'a': '123', 'abc123': 'foobar-again'}
-        with cli.tempdir() as labels_dir:
+        with resolve.tempdir() as labels_dir:
             label_tag.write_labels(labels_dir, expected)
             result = deploy.tags_by_label(labels_dir)
         self.assertEqual(result, expected)
