@@ -1,0 +1,36 @@
+{% set data = load_setuptools() %}
+
+package:
+    name: conda-gitenv
+    version: {{data.get('version')}}
+
+source:
+    path: ../
+
+build:
+    script: python setup.py install --single-version-externally-managed --record=record.txt
+
+requirements:
+    build:
+        - python
+        - setuptools
+    run:
+        - python
+        - setuptools
+        - gitpython
+        - pyyaml
+        - conda-build-all
+
+test:
+  imports:
+    - conda_gitenv
+  commands:
+    - conda gitenv --help
+    - conda gitenv resolve --help
+    - conda gitenv autotag --help
+    - conda gitenv autolabel --help
+    - conda gitenv deploy --help
+
+about:
+  license: BSD-3
+  home: https://github.com/scitools/conda-gitenv
