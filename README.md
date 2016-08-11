@@ -20,7 +20,7 @@ git checkout -b default
 cat <<EOF > env.spec
 channels:
  - defaults
- env: 
+env: 
  - python
 
 EOF
