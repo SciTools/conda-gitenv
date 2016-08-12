@@ -19,6 +19,7 @@ requirements:
         - setuptools
         - gitpython
         - pyyaml
+        - conda >=4.1
         - conda-build-all
 
 test:
