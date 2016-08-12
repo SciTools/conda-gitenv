@@ -39,8 +39,9 @@ def resolve_spec(spec_fh):
     full_list_of_packages = sorted(solver.solve(env_spec), key=lambda pkg: pkg.lower())
     pkgs = []
     for pkg in full_list_of_packages:
-        r = index[pkg]
-        pkgs.append('\t'.join([r['channel'], pkg[:-len('.tar.bz2')]])), 
+        pkg_info = index[pkg]
+        pkgs.append('\t'.join([pkg_info['channel'],
+                               pkg_info['fn'][:-len('.tar.bz2')]])), 
     return pkgs
 
 

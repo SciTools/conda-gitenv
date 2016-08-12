@@ -76,7 +76,7 @@ def create_env(pkgs, target, pkg_cache):
         for source, pkg in pkgs:
             index = conda.fetch.fetch_index([source], use_cache=False)
             # Deal with the fact that a recent conda includes the source in the index key.
-            index = {pkg['fn']: pkg for pkg in pkg.values()}
+            index = {pkg['fn']: pkg for pkg in index.values()}
 
             tar_name = pkg + '.tar.bz2'
             pkg_info = index.get(tar_name, None)
@@ -90,12 +90,12 @@ def create_env(pkgs, target, pkg_cache):
             # conda/conda is updated to be more precise with its locks.
             lock_name = os.path.join(pkg_cache, dist_name)
             with Locked(lock_name):
-                if not conda.install.is_extracted(pkg_cache, dist_name):
-                    if not conda.install.is_fetched(pkg_cache, dist_name):
+                if not conda.install.is_extracted(dist_name):
+                    if not conda.install.is_fetched(dist_name):
                         print('Fetching {}'.format(dist_name))
-                        conda.fetch.fetch_pkg(pkg_info, pkg_cache)
-                    conda.install.extract(pkg_cache, dist_name)
-                conda.install.link(pkg_cache, target, dist_name)
+                        conda.fetch.fetch_pkg(pkg_info)
+                    conda.install.extract(dist_name)
+                conda.install.link(target, dist_name)
 
 
 def deploy_repo(repo, target):
