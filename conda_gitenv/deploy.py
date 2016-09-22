@@ -90,7 +90,10 @@ def create_env(pkgs, target, pkg_cache):
             # conda/conda is updated to be more precise with its locks.
             lock_name = os.path.join(pkg_cache, dist_name)
             with Locked(lock_name):
-                schannel_dist_name='{}::{}'.format(pkg_info['schannel'], dist_name)
+                schannel_dist_name = dist_name
+                if pkg_info['schannel'] != 'defaults':
+                    schannel_dist_name='{}::{}'.format(pkg_info['schannel'],
+                                                       dist_name)
                 if not conda.install.is_extracted(schannel_dist_name):
                     if not conda.install.is_fetched(schannel_dist_name):
                         print('Fetching {}'.format(dist_name))
