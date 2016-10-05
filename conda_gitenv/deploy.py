@@ -2,6 +2,7 @@
 from __future__ import print_function
 
 import datetime
+import fnmatch
 from glob import glob
 import os
 import time
@@ -9,8 +10,8 @@ import time
 from git import Repo
 import conda.api
 import conda.fetch
-from conda_gitenv.resolve import tempdir, create_tracking_branches
 
+from conda_gitenv.resolve import tempdir, create_tracking_branches
 from conda_gitenv.lock import Locked
 from conda_gitenv import manifest_branch_prefix
 
@@ -98,7 +99,7 @@ def create_env(pkgs, target, pkg_cache):
                 conda.install.link(target, dist_name)
 
 
-def deploy_repo(repo, target):
+def deploy_repo(repo, target, desired_env_labels=('*')):
     env_tags = tags_by_env(repo)
     for branch in repo.branches:
         # We only want environment branches, not manifest branches.
@@ -110,12 +111,21 @@ def deploy_repo(repo, target):
                 continue
             manifest_branch = repo.branches[manifest_branch_name]
             branch.checkout()
-            labelled_tags = tags_by_label(os.path.join(repo.working_dir, 'labels'))
-            # We want to deploy all tags which have a label, as well as the latest tag.
+            all_labelled_tags = tags_by_label(os.path.join(repo.working_dir, 'labels'))
+
+            # Create a latest tag that points to the most recently tagged environment.
             if env_tags.get(branch.name):
                 latest_tag = max(env_tags[branch.name],
                                  key=lambda t: t.commit.committed_date)
-                labelled_tags['latest'] = latest_tag.name
+                all_labelled_tags['latest'] = latest_tag.name
+
+            # Only deploy environments that match the given pattern.
+            labelled_tags = {}
+            for label, tag in all_labelled_tags.items():
+                if any([fnmatch.fnmatch('{}/{}'.format(branch.name, label),
+                                        env_label) for env_label in desired_env_labels]):
+                    labelled_tags[label] = tag
+
             for tag in set(labelled_tags.values()):
                 deploy_tag(repo, tag, target)
             for label, tag in labelled_tags.items():
@@ -136,6 +146,9 @@ def deploy_repo(repo, target):
 def configure_parser(parser):
     parser.add_argument('repo_uri', help='Repo to deploy.')
     parser.add_argument('target', help='Location to deploy the environments to.')
+    parser.add_argument('--env_labels', nargs='+',  default=['*'], 
+                        help='Pattern to match environment labels to. In the '
+                             'form "{environment}/{label}".',)
     parser.set_defaults(function=handle_args)
     return parser
 
@@ -144,7 +157,7 @@ def handle_args(args):
     with tempdir() as repo_directory:
         repo = Repo.clone_from(args.repo_uri, repo_directory)
         create_tracking_branches(repo)
-        deploy_repo(repo, args.target)
+        deploy_repo(repo, args.target, args.env_labels)
 
 
 def main():

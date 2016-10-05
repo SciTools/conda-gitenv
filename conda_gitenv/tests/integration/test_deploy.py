@@ -44,23 +44,34 @@ class Test(unittest.TestCase):
 
         self.repo = repo
 
+    def check_link_exists(self, tmpdir, env, label):
+        link = os.path.join(tmpdir, env, label)
+        target = os.path.join(tmpdir, env, os.readlink(link))
+        return os.path.exists(target)
+
     def test(self):
         with resolve.tempdir() as tmpdir:
             deploy.deploy_repo(self.repo, tmpdir)
 
-            def link_target(env, label):
-                link = os.path.join(tmpdir, env, label)
-                target = os.path.join(tmpdir, env, os.readlink(link))
-                return target 
-
-            self.assertTrue(os.path.exists(link_target('default', 'next')))
-            self.assertTrue(os.path.exists(link_target('default', 'current')))
-            self.assertTrue(os.path.exists(link_target('bleeding', 'next')))
-            self.assertTrue(os.path.exists(link_target('bleeding', 'latest')))
-            self.assertTrue(os.path.exists(link_target('default', 'latest')))
+            self.assertTrue(self.check_link_exists(tmpdir, 'default', 'next'))
+            self.assertTrue(self.check_link_exists(tmpdir, 'default', 'current'))
+            self.assertTrue(self.check_link_exists(tmpdir, 'bleeding', 'next'))
+            self.assertTrue(self.check_link_exists(tmpdir, 'bleeding', 'latest'))
+            self.assertTrue(self.check_link_exists(tmpdir, 'default', 'latest'))
 
             # Check that we can resolve those links, finding the python executable.
             self.assertTrue(os.path.exists(os.path.join(tmpdir, 'bleeding', 'next', 'bin', 'python')))
+
+    def test_specified_env_labels(self):
+        with resolve.tempdir() as tmpdir:
+            deploy.deploy_repo(self.repo, tmpdir, ['default/next', 'bleeding/*'])
+
+            self.assertTrue(self.check_link_exists(tmpdir, 'default', 'next'))
+            self.assertTrue(self.check_link_exists(tmpdir, 'bleeding', 'next'))
+            self.assertTrue(self.check_link_exists(tmpdir, 'bleeding', 'latest'))
+            
+            self.assertFalse(os.path.exists(os.path.join(tmpdir, 'default', 'current')))
+            self.assertFalse(os.path.exists(os.path.join(tmpdir, 'default', 'latest')))
 
 
 if __name__ == '__main__':
