@@ -1,3 +1,4 @@
 gitpython
 pyyaml
 conda-build-all
+conda-build ==2.0.6
