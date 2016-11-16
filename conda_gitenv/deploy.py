@@ -95,6 +95,7 @@ def create_env(pkgs, target, pkg_cache):
                 if pkg_info['schannel'] != 'defaults':
                     schannel_dist_name='{}::{}'.format(pkg_info['schannel'],
                                                        dist_name)
+                conda.install.pkgs_dirs=[pkg_cache]
                 if not conda.install.is_extracted(schannel_dist_name):
                     if not conda.install.is_fetched(schannel_dist_name):
                         print('Fetching {}'.format(dist_name))
