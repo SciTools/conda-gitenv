@@ -35,7 +35,7 @@ def tags_by_env(repo):
     return tags
 
 
-def deploy_tag(repo, tag_name, target):
+def deploy_tag(repo, tag_name, target, pkg_cache):
     tag = repo.tags[tag_name]
     # Checkout the tag in a detached head form.
     repo.head.reference = tag.commit
@@ -50,19 +50,10 @@ def deploy_tag(repo, tag_name, target):
         raise ValueError("The tag '{}' doesn't have a manifested environment.".format(tag_name))
     with open(manifest_fname, 'r') as fh:
         manifest = sorted(line.strip().split('\t') for line in fh)
-    create_env(manifest, os.path.join(target, env_name, deployed_name), os.path.join(target, '.pkg_cache'))
+    create_env(manifest, os.path.join(target, env_name, deployed_name), pkg_cache)
 
 
 def create_env(pkgs, target, pkg_cache):
-    # Cache settings to be reinstated at the end.
-    orig_package_cache_ = conda.install.package_cache_
-    orig_pkgs_dirs = conda.install.pkgs_dirs
-
-    # Empty package cache so that it will reinitialised.
-    conda.install.package_cache_ = {}
-    # Set pkgs_dirs location to be the specified pkg_cache.
-    conda.install.pkgs_dirs = [pkg_cache]
-
     # We lock the specific environment we are wanting to create. If other requests come in for the
     # exact same environment, they will have to wait for this to finish (good).
     with Locked(target):
@@ -111,11 +102,18 @@ def create_env(pkgs, target, pkg_cache):
                     conda.install.extract(schannel_dist_name)
                 conda.install.link(target, schannel_dist_name)
 
-    conda.install.package_cache_ = orig_package_cache_
-    conda.install.pkgs_dirs = orig_pkgs_dirs
-
 
 def deploy_repo(repo, target, desired_env_labels=('*')):
+    # Cache settings to be reinstated at the end.
+    orig_package_cache_ = conda.install.package_cache_
+    orig_pkgs_dirs = conda.install.pkgs_dirs
+
+    # Empty package cache so that it will reinitialised.
+    conda.install.package_cache_ = {}
+    # Set pkgs_dirs location to be the specified pkg_cache.
+    pkg_cache = os.path.join(target, '.pkg_cache')
+    conda.install.pkgs_dirs = [pkg_cache]
+
     env_tags = tags_by_env(repo)
     for branch in repo.branches:
         # We only want environment branches, not manifest branches.
@@ -143,7 +141,7 @@ def deploy_repo(repo, target, desired_env_labels=('*')):
                     labelled_tags[label] = tag
 
             for tag in set(labelled_tags.values()):
-                deploy_tag(repo, tag, target)
+                deploy_tag(repo, tag, target, pkg_cache)
             for label, tag in labelled_tags.items():
                 with Locked(os.path.join(target, label)):
                     deployed_name = tag.split('-', 2)[2]
@@ -158,6 +156,10 @@ def deploy_repo(repo, target, desired_env_labels=('*')):
                     if not os.path.exists(label_location):
                         print('Linking {}/{} to {}'.format(branch.name, label, tag))
                         os.symlink(label_target, label_location)
+
+    conda.install.package_cache_ = orig_package_cache_
+    conda.install.pkgs_dirs = orig_pkgs_dirs
+
 
 def configure_parser(parser):
     parser.add_argument('repo_uri', help='Repo to deploy.')
