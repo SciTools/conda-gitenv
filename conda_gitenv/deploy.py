@@ -54,6 +54,11 @@ def deploy_tag(repo, tag_name, target):
 
 
 def create_env(pkgs, target, pkg_cache):
+    # Empty package cache so that it will reinitialised.
+    conda.install.package_cache_ = {}
+    # Set pkgs_dir location to be the specified pkg_cache.
+    conda.install.pkgs_dirs=[pkg_cache]
+
     # We lock the specific environment we are wanting to create. If other requests come in for the
     # exact same environment, they will have to wait for this to finish (good).
     with Locked(target):
@@ -95,13 +100,14 @@ def create_env(pkgs, target, pkg_cache):
                 if pkg_info['schannel'] != 'defaults':
                     schannel_dist_name='{}::{}'.format(pkg_info['schannel'],
                                                        dist_name)
-                conda.install.pkgs_dirs=[pkg_cache]
+
                 if not conda.install.is_extracted(schannel_dist_name):
                     if not conda.install.is_fetched(schannel_dist_name):
                         print('Fetching {}'.format(dist_name))
                         conda.fetch.fetch_pkg(pkg_info)
                     conda.install.extract(schannel_dist_name)
                 conda.install.link(target, schannel_dist_name)
+    conda.install.package_cache_ = {}
 
 
 def deploy_repo(repo, target, desired_env_labels=('*')):
