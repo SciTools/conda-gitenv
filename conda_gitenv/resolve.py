@@ -60,6 +60,9 @@ def build_manifest_branches(repo):
             continue
         with open(spec_fname, 'r') as fh:
             pkgs = resolve_spec(fh)
+            # Cache the contents of the env.spec file from the source branch.
+            fh.seek(0)
+            spec_lines = fh.readlines()
         manifest_branch_name = '{}{}'.format(manifest_branch_prefix, name)
         if manifest_branch_name in repo.branches:
             manifest_branch = repo.branches[manifest_branch_name]
@@ -69,7 +72,10 @@ def build_manifest_branches(repo):
         manifest_path = os.path.join(repo.working_dir, 'env.manifest')
         with open(manifest_path, 'w') as fh:
             fh.write('\n'.join(pkgs))
-        repo.index.add([manifest_path])
+        # Write the env.spec from the source branch into the manifest branch.
+        with open(spec_fname, 'w') as fh:
+            fh.writelines(spec_lines)
+        repo.index.add([manifest_path, spec_fname])
         if repo.is_dirty():
             repo.index.commit('Manifest update from {:%Y-%m-%d %H:%M:%S}.'
                               ''.format(datetime.datetime.now()))
