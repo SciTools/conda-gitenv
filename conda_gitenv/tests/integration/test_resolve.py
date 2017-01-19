@@ -8,8 +8,8 @@ import conda_gitenv.tests.integration.setup_samples as setup_samples
 
 
 class Test_full_build(unittest.TestCase):
-    def check_basic_env(self):
-        repo = setup_samples.basic_repo()
+    def check_env(self, name):
+        repo = setup_samples.basic_repo(name)
         self.assertNotIn('manifest/master', repo.branches)
         check_call(['conda', 'gitenv', 'resolve', repo.working_dir])
         self.assertIn('manifest/master', repo.branches)
@@ -23,11 +23,11 @@ class Test_full_build(unittest.TestCase):
             self.assertIn('zlib', pkg_names)
         return repo
 
-    def test_basic_env(self):
-        self.check_basic_env()
+    def test_env_basic(self):
+        self.check_env('basic')
 
-    def test_update_env(self):
-        repo = self.check_basic_env()
+    def test_env_update(self):
+        repo = self.check_env('update')
         master = repo.branches['master']
         spec = """
             env:

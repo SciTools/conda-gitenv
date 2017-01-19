@@ -34,9 +34,9 @@ def update_env(repo, branch, spec, comment=None):
     repo.index.commit(comment)
 
 
-def basic_repo():
+def basic_repo(name='basic'):
     # The simplest kind of repo. One env defined under the name "master"
-    repo = create_repo('basic')
+    repo = create_repo(name)
     branch = add_env(repo, 'master', """
         env:
          - python
