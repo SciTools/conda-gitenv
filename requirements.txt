@@ -3,4 +3,4 @@ pyyaml
 conda ==4.1.12
 conda-build-all
 conda-build ==2.0.6
-requests ==2.11.1 
+requests !=2.12.0 
