@@ -14,4 +14,6 @@ class Locked(conda.lock.Locked):
         """
         dirname, basename = os.path.split(directory_to_lock.rstrip(os.pathsep))
         path = os.path.join(dirname, '.conda-lock_' + basename)
+        if not os.path.isdir(dirname):
+            os.makedirs(dirname)
         return conda.lock.Locked.__init__(self, path)
