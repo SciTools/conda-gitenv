@@ -23,18 +23,20 @@ def add_env(repo, name, spec):
     return branch
 
 
-def update_env(repo, branch, spec):
+def update_env(repo, branch, spec, comment=None):
     branch.checkout()
     env_spec = os.path.join(repo.working_dir, 'env.spec')
     with open(env_spec, 'w') as fh:
         fh.write(textwrap.dedent(spec))
     repo.index.add([env_spec])
-    repo.index.commit('Add {} spec'.format(branch.name))
+    if comment is None:
+        comment = 'Add {} spec'.format(branch.name)
+    repo.index.commit(comment)
 
 
-def basic_repo():
+def basic_repo(name='basic'):
     # The simplest kind of repo. One env defined under the name "master"
-    repo = create_repo('basic')
+    repo = create_repo(name)
     branch = add_env(repo, 'master', """
         env:
          - python

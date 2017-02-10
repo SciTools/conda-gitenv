@@ -74,8 +74,14 @@ def create_env(pkgs, target, pkg_cache):
             # The downside is that we are not verifying that each package is installed correctly.
             return
 
+        try:
+            # Support conda>4.1
+            from conda.models.channel import prioritize_channels
+        except ImportError:
+            prioritize_channels = lambda nop: nop
+
         for source, pkg in pkgs:
-            index = conda.fetch.fetch_index([source], use_cache=False)
+            index = conda.fetch.fetch_index(prioritize_channels([source]), use_cache=False)
             # Deal with the fact that a recent conda includes the source in the index key.
             index = {pkg['fn']: pkg for pkg in index.values()}
 
@@ -103,16 +109,28 @@ def create_env(pkgs, target, pkg_cache):
                 conda.install.link(target, schannel_dist_name)
 
 
-def deploy_repo(repo, target, desired_env_labels=('*')):
+def deploy_repo(repo, target, desired_env_labels=None):
+    # Set pkgs_dirs location to be the specified pkg_cache.
     # Cache settings to be reinstated at the end.
+    import conda
     orig_package_cache_ = conda.install.package_cache_
-    orig_pkgs_dirs = conda.install.pkgs_dirs
+    pkg_cache = os.path.join(target, '.pkg_cache')
+    try:
+        # Support conda=4.1.*
+        orig_pkgs_dirs = conda.install.pkgs_dirs
+        conda.install.pkgs_dirs = [pkg_cache]
+    except AttributeError:
+        # Support conda>4.1
+        @property
+        def mocker(self):
+            return [pkg_cache]
+        import conda.base.context
+        orig_pkgs_dirs = conda.base.context.Context.pkgs_dirs
+        # Monkey patch the context instance property.
+        conda.base.context.Context.pkgs_dirs = mocker
 
     # Empty package cache so that it will reinitialised.
     conda.install.package_cache_ = {}
-    # Set pkgs_dirs location to be the specified pkg_cache.
-    pkg_cache = os.path.join(target, '.pkg_cache')
-    conda.install.pkgs_dirs = [pkg_cache]
 
     env_tags = tags_by_env(repo)
     for branch in repo.branches:
@@ -135,6 +153,8 @@ def deploy_repo(repo, target, desired_env_labels=('*')):
 
             # Only deploy environments that match the given pattern.
             labelled_tags = {}
+            if desired_env_labels is None:
+                desired_env_labels = ['*']
             for label, tag in all_labelled_tags.items():
                 if any([fnmatch.fnmatch('{}/{}'.format(branch.name, label),
                                         env_label) for env_label in desired_env_labels]):
@@ -158,7 +178,11 @@ def deploy_repo(repo, target, desired_env_labels=('*')):
                         os.symlink(label_target, label_location)
 
     conda.install.package_cache_ = orig_package_cache_
-    conda.install.pkgs_dirs = orig_pkgs_dirs
+    if isinstance(orig_pkgs_dirs, property):
+        # Support conda>4.1
+        conda.base.context.Context.pkgs_dirs = orig_pkgs_dirs
+    else:
+        conda.install.pkgs_dirs = orig_pkgs_dirs
 
 
 def configure_parser(parser):

@@ -25,6 +25,7 @@ install:
 
     # Now do the things we need to do to install it.
     - conda install --file requirements.txt nose mock python=${PYTHON} --yes --quiet -c conda-forge
+    - conda list
     - python setup.py install
 
 script:
