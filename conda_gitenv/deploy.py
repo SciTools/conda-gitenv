@@ -3,10 +3,18 @@ from __future__ import print_function
 
 import datetime
 import fnmatch
+from functools import wraps
 from glob import glob
 import os
 import time
 
+import conda.base.context
+from conda.core.link import UnlinkLinkTransaction
+from conda.core.package_cache import ProgressiveFetchExtract
+from conda.exports import Resolve, fetch_index
+from conda.models.channel import prioritize_channels
+from conda.models.dist import Dist
+from conda.gateways.disk.create import mkdir_p
 from git import Repo
 import yaml
 
@@ -34,7 +42,7 @@ def tags_by_env(repo):
     return tags
 
 
-def deploy_tag(repo, tag_name, target, pkg_cache):
+def deploy_tag(repo, tag_name, target):
     tag = repo.tags[tag_name]
     # Checkout the tag in a detached head form.
     repo.head.reference = tag.commit
@@ -51,24 +59,12 @@ def deploy_tag(repo, tag_name, target, pkg_cache):
         manifest = sorted(line.strip().split('\t') for line in fh)
 
     target = os.path.join(target, env_name, deployed_name)
-    create_env(repo, manifest, target, pkg_cache)
+    create_env(repo, manifest, target)
 
 
-def create_env(repo, pkgs, target, pkg_cache):
-    from conda.core.link import UnlinkLinkTransaction
-    from conda.core.package_cache import ProgressiveFetchExtract
-    from conda.exports import Resolve, fetch_index
-    from conda.models.channel import prioritize_channels
-    from conda.models.dist import Dist
-    from conda.gateways.disk.create import mkdir_p
-
-    spec_fname = os.path.join(repo.working_dir, 'env.spec')
-
-    # Skip branches that don't have an environment specification
-    if not os.path.exists(spec_fname):
-        return
-
+def create_env(repo, pkgs, target):
     with Locked(target):
+        spec_fname = os.path.join(repo.working_dir, 'env.spec')
         with open(spec_fname, 'r') as fh:
             spec = yaml.safe_load(fh)
 
@@ -91,21 +87,36 @@ def create_env(repo, pkgs, target, pkg_cache):
         txn.execute()
 
 
+def _patch_pkgs_dirs(func):
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        if len(args) >= 2:
+            # Sniff the args to get the target deployment directory.
+            target = args[1]
+            # The associated target deployment custom package cache directory.
+            pkg_cache = os.path.join(target, '.pkg_cache')
+            @property
+            def mocker(self):
+                return (pkg_cache,)
+            orig_pkgs_dirs = conda.base.context.Context.pkgs_dirs
+            # Monkey patch the context pkgs_dirs property to override
+            # it with our custom package cache directory.
+            conda.base.context.Context.pkgs_dirs = mocker
+
+        result = func(*args, **kwargs)
+
+        # Undo the monkey patch of the context pkgs_dirs property.
+        conda.base.context.Context.pkgs_dirs = orig_pkgs_dirs
+
+        return result
+
+    return wrapper
+
+
+@_patch_pkgs_dirs
 def deploy_repo(repo, target, desired_env_labels=None):
-    # Set pkgs_dirs location to be the specified pkg_cache.
-    # Cache settings to be reinstated at the end.
-    import conda.base.context
-
-    pkg_cache = os.path.join(target, '.pkg_cache')
-    @property
-    def mocker(self):
-        return (pkg_cache,)
-    orig_pkgs_dirs = conda.base.context.Context.pkgs_dirs
-    # Monkey patch the context pkgs_dirs property to override it
-    # with our custom package cache directory.
-    conda.base.context.Context.pkgs_dirs = mocker
-
     env_tags = tags_by_env(repo)
+
     for branch in repo.branches:
         # We only want environment branches, not manifest branches.
         if not branch.name.startswith(manifest_branch_prefix):
@@ -134,7 +145,7 @@ def deploy_repo(repo, target, desired_env_labels=None):
                     labelled_tags[label] = tag
 
             for tag in set(labelled_tags.values()):
-                deploy_tag(repo, tag, target, pkg_cache)
+                deploy_tag(repo, tag, target)
 
             for label, tag in labelled_tags.items():
                 with Locked(os.path.join(target, label)):
@@ -150,9 +161,6 @@ def deploy_repo(repo, target, desired_env_labels=None):
                     if not os.path.exists(label_location):
                         print('Linking {}/{} to {}'.format(branch.name, label, tag))
                         os.symlink(label_target, label_location)
-
-    # Undo the monkey patch of the context pkgs_dirs property.
-    conda.base.context.Context.pkgs_dirs = orig_pkgs_dirs
 
 
 def configure_parser(parser):

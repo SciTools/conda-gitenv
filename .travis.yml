@@ -10,7 +10,6 @@ env:
 
     matrix:
         - PYTHON=2.7
-        - PYTHON=3.5
         - PYTHON=3.6
 
 install:
