@@ -13,6 +13,6 @@ del get_versions
 _conda_base = StrictVersion('4.3.0')
 _conda_version = StrictVersion(CONDA_VERSION)
 _conda_supported = _conda_version >= _conda_base
-assert _conda_support, 'Minimum supported conda version is {}, got {}.'.format(_conda_base, _conda_version)
+assert _conda_supported, 'Minimum supported conda version is {}, got {}.'.format(_conda_base, _conda_version)
 
 manifest_branch_prefix = 'manifest/'
