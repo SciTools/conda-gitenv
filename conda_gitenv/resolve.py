@@ -35,10 +35,12 @@ def resolve_spec(spec_fh):
     spec = yaml.safe_load(spec_fh)
     env_spec = spec.get('env', [])
     index = conda.api.get_index(spec.get('channels', []), prepend=False, use_cache=False)
-    solver = conda.resolve.Resolve(index)
-    full_list_of_packages = sorted(solver.solve(env_spec), key=lambda pkg: pkg.lower())
+    resolver = conda.resolve.Resolve(index)
+    packages = sorted(resolver.solve(env_spec),
+                      key=lambda pkg: pkg.dist_name.lower())
+
     pkgs = []
-    for pkg in full_list_of_packages:
+    for pkg in packages:
         pkg_info = index[pkg]
         pkgs.append('\t'.join([pkg_info['channel'],
                                pkg_info['fn'][:-len('.tar.bz2')]])), 
