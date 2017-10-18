@@ -8,7 +8,7 @@ try:
 except ImportError:
     from StringIO import StringIO
 
-import conda.resolve
+from conda.exceptions import NoPackagesFound
 
 from conda_gitenv.resolve import resolve_spec, tempdir
 from conda_build_all.tests.unit import dummy_index
@@ -27,9 +27,9 @@ class Test_resolve_spec(unittest.TestCase):
     def test(self):
         # Check that resolve_spec is returning the expected content.
         index = dummy_index.DummyIndex()
-        index.add_pkg('foo', '2.7.0', depends=('bar',))
-        index.add_pkg('foo', '3.5.0', depends=('bar',))
-        index.add_pkg('bar', '1.2')
+        index.add_pkg('foo', '2.7.0', depends=('bar',), build_number=0)
+        index.add_pkg('foo', '3.5.0', depends=('bar',), build_number=0)
+        index.add_pkg('bar', '1.2', build_number=0)
 
         with tempdir() as tmp:
             channel = index.write_to_channel(tmp)
@@ -51,7 +51,7 @@ class Test_resolve_spec(unittest.TestCase):
                                 env:
                                     - python
                                 """) as specfile:
-            with self.assertRaises(conda.resolve.NoPackagesFound):
+            with self.assertRaises(NoPackagesFound):
                 pkgs = resolve_spec(specfile)
 
 

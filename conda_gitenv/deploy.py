@@ -3,16 +3,23 @@ from __future__ import print_function
 
 import datetime
 import fnmatch
+from functools import wraps
 from glob import glob
 import os
 import time
 
+import conda.base.context
+from conda.core.link import UnlinkLinkTransaction
+from conda.core.package_cache import ProgressiveFetchExtract
+from conda.exports import Resolve, fetch_index
+from conda.models.channel import prioritize_channels
+from conda.models.dist import Dist
+from conda.gateways.disk.create import mkdir_p
 from git import Repo
-import conda.api
-import conda.fetch
+import yaml
 
-from conda_gitenv.resolve import tempdir, create_tracking_branches
 from conda_gitenv.lock import Locked
+from conda_gitenv.resolve import create_tracking_branches, tempdir
 from conda_gitenv import manifest_branch_prefix
 
 
@@ -35,7 +42,7 @@ def tags_by_env(repo):
     return tags
 
 
-def deploy_tag(repo, tag_name, target, pkg_cache):
+def deploy_tag(repo, tag_name, target):
     tag = repo.tags[tag_name]
     # Checkout the tag in a detached head form.
     repo.head.reference = tag.commit
@@ -50,89 +57,66 @@ def deploy_tag(repo, tag_name, target, pkg_cache):
         raise ValueError("The tag '{}' doesn't have a manifested environment.".format(tag_name))
     with open(manifest_fname, 'r') as fh:
         manifest = sorted(line.strip().split('\t') for line in fh)
-    create_env(manifest, os.path.join(target, env_name, deployed_name), pkg_cache)
+
+    target = os.path.join(target, env_name, deployed_name)
+    create_env(repo, manifest, target)
 
 
-def create_env(pkgs, target, pkg_cache):
-    # We lock the specific environment we are wanting to create. If other requests come in for the
-    # exact same environment, they will have to wait for this to finish (good).
+def create_env(repo, pkgs, target):
     with Locked(target):
-        pkg_names = set(pkg for _, pkg in pkgs)
-        if os.path.exists(target):
-            # The environment we want to deploy already exists. We should just double check that
-            # there aren't already packages in there which we need to remove before we install anything
-            # new.
-            linked = conda.install.linked(target)
-            for pkg in linked:
-                if pkg not in pkg_names:
-                    conda.install.unlink(target, pkg)
-        else:
-            linked = []
+        spec_fname = os.path.join(repo.working_dir, 'env.spec')
+        with open(spec_fname, 'r') as fh:
+            spec = yaml.safe_load(fh)
 
-        if set(linked) == pkg_names:
-            # We don't need to re-link everything - it is already as expected.
-            # The downside is that we are not verifying that each package is installed correctly.
-            return
+        channels = prioritize_channels(spec.get('channels', []))
+        # Build reverse look-up from channel URL to channel name.
+        channel_by_url = {url: channel for url, (channel, _) in channels.items()}
+        index = fetch_index(channels, use_cache=False)
+        resolver = Resolve(index)
+        # Create the package distribution from the manifest. Ensure to replace
+        # channel-URLs with channel names, otherwise the fetch-extract may fail.
+        dists = [Dist.from_string(pkg, channel_override=channel_by_url.get(url, url)) for url, pkg in pkgs]
+        # Use the resolver to sort packages into the appropriate dependency
+        # order.
+        sorted_dists = resolver.dependency_sort({dist.name: dist for dist in dists})
 
-        try:
-            # Support conda>4.1
-            from conda.models.channel import prioritize_channels
-        except ImportError:
-            prioritize_channels = lambda nop: nop
-
-        for source, pkg in pkgs:
-            index = conda.fetch.fetch_index(prioritize_channels([source]), use_cache=False)
-            # Deal with the fact that a recent conda includes the source in the index key.
-            index = {pkg['fn']: pkg for pkg in index.values()}
-
-            tar_name = pkg + '.tar.bz2'
-            pkg_info = index.get(tar_name, None)
-            if pkg_info is None:
-                raise ValueError('Distribution {} is no longer available in the channel.'.format(tar_name))
-            dist_name = pkg 
-            # We force a lock on retrieving anything which needs access to a distribution of this
-            # name. If other requests come in to get the exact same package they will have to wait
-            # for this to finish (good). If conda itself it fetching these pacakges then there is
-            # the potential for a race condition (bad) - there is no solution to this unless
-            # conda/conda is updated to be more precise with its locks.
-            lock_name = os.path.join(pkg_cache, dist_name)
-            with Locked(lock_name):
-                schannel_dist_name = dist_name
-                if pkg_info['schannel'] != 'defaults':
-                    schannel_dist_name='{}::{}'.format(pkg_info['schannel'],
-                                                       dist_name)
-                if not conda.install.is_extracted(schannel_dist_name):
-                    if not conda.install.is_fetched(schannel_dist_name):
-                        print('Fetching {}'.format(dist_name))
-                        conda.fetch.fetch_pkg(pkg_info)
-                    conda.install.extract(schannel_dist_name)
-                conda.install.link(target, schannel_dist_name)
+        pfe = ProgressiveFetchExtract(index, dists)
+        pfe.execute()
+        mkdir_p(target)
+        txn = UnlinkLinkTransaction.create_from_dists(index, target, (), dists)
+        txn.execute()
 
 
+def _patch_pkgs_dirs(func):
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        if len(args) >= 2:
+            # Sniff the args to get the target deployment directory.
+            target = args[1]
+            # The associated target deployment custom package cache directory.
+            pkg_cache = os.path.join(target, '.pkg_cache')
+            @property
+            def mocker(self):
+                return (pkg_cache,)
+            orig_pkgs_dirs = conda.base.context.Context.pkgs_dirs
+            # Monkey patch the context pkgs_dirs property to override
+            # it with our custom package cache directory.
+            conda.base.context.Context.pkgs_dirs = mocker
+
+        result = func(*args, **kwargs)
+
+        # Undo the monkey patch of the context pkgs_dirs property.
+        conda.base.context.Context.pkgs_dirs = orig_pkgs_dirs
+
+        return result
+
+    return wrapper
+
+
+@_patch_pkgs_dirs
 def deploy_repo(repo, target, desired_env_labels=None):
-    # Set pkgs_dirs location to be the specified pkg_cache.
-    # Cache settings to be reinstated at the end.
-    import conda
-    orig_package_cache_ = conda.install.package_cache_
-    pkg_cache = os.path.join(target, '.pkg_cache')
-    try:
-        # Support conda=4.1.*
-        orig_pkgs_dirs = conda.install.pkgs_dirs
-        conda.install.pkgs_dirs = [pkg_cache]
-    except AttributeError:
-        # Support conda>4.1
-        @property
-        def mocker(self):
-            return [pkg_cache]
-        import conda.base.context
-        orig_pkgs_dirs = conda.base.context.Context.pkgs_dirs
-        # Monkey patch the context instance property.
-        conda.base.context.Context.pkgs_dirs = mocker
-
-    # Empty package cache so that it will reinitialised.
-    conda.install.package_cache_ = {}
-
     env_tags = tags_by_env(repo)
+
     for branch in repo.branches:
         # We only want environment branches, not manifest branches.
         if not branch.name.startswith(manifest_branch_prefix):
@@ -161,7 +145,8 @@ def deploy_repo(repo, target, desired_env_labels=None):
                     labelled_tags[label] = tag
 
             for tag in set(labelled_tags.values()):
-                deploy_tag(repo, tag, target, pkg_cache)
+                deploy_tag(repo, tag, target)
+
             for label, tag in labelled_tags.items():
                 with Locked(os.path.join(target, label)):
                     deployed_name = tag.split('-', 2)[2]
@@ -176,13 +161,6 @@ def deploy_repo(repo, target, desired_env_labels=None):
                     if not os.path.exists(label_location):
                         print('Linking {}/{} to {}'.format(branch.name, label, tag))
                         os.symlink(label_target, label_location)
-
-    conda.install.package_cache_ = orig_package_cache_
-    if isinstance(orig_pkgs_dirs, property):
-        # Support conda>4.1
-        conda.base.context.Context.pkgs_dirs = orig_pkgs_dirs
-    else:
-        conda.install.pkgs_dirs = orig_pkgs_dirs
 
 
 def configure_parser(parser):
