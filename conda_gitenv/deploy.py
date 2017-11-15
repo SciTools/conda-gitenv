@@ -80,10 +80,10 @@ def create_env(repo, pkgs, target):
         # order.
         sorted_dists = resolver.dependency_sort({dist.name: dist for dist in dists})
 
-        pfe = ProgressiveFetchExtract(index, dists)
+        pfe = ProgressiveFetchExtract(index, sorted_dists)
         pfe.execute()
         mkdir_p(target)
-        txn = UnlinkLinkTransaction.create_from_dists(index, target, (), dists)
+        txn = UnlinkLinkTransaction.create_from_dists(index, target, (), sorted_dists)
         txn.execute()
 
 
