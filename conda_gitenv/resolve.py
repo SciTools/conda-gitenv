@@ -74,6 +74,8 @@ def build_manifest_branches(repo):
         manifest_path = os.path.join(repo.working_dir, 'env.manifest')
         with open(manifest_path, 'w') as fh:
             fh.write('\n'.join(pkgs))
+            # Ensure the manifest has a trailing newline.
+            fh.write('\n')
         # Write the env.spec from the source branch into the manifest branch.
         with open(spec_fname, 'w') as fh:
             fh.writelines(spec_lines)
