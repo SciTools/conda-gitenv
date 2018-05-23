@@ -16,6 +16,7 @@ import logging
 import os
 import shutil
 import tempfile
+import warnings
 
 import conda.resolve
 import conda.api
@@ -54,6 +55,10 @@ def build_manifest_branches(repo):
     for branch in repo.branches:
         name = branch.name
         if name.startswith(manifest_branch_prefix):
+            continue
+        if '-' in name:
+            warnings.warn('Branch {} cannot be resolved as it contains at '
+                          'least one "-" character.'.format(name))
             continue
         branch.checkout()
         spec_fname = os.path.join(repo.working_dir, 'env.spec')
