@@ -1,5 +1,7 @@
 gitpython
 pyyaml
 conda-build-all
+# conda-build-all requires an old conda version. See https://github.com/conda-forge/conda-build-all-feedstock/issues/43.
+conda<4.4
 conda-build
 requests
