@@ -1,12 +1,11 @@
 #!/usr/bin/env python
 from __future__ import print_function
 
-import datetime
-import fnmatch
+from fnmatch import fnmatch
 from functools import wraps
 from glob import glob
 import os
-import time
+import stat
 
 import conda.base.context
 from conda.core.link import UnlinkLinkTransaction
@@ -21,6 +20,9 @@ import yaml
 from conda_gitenv.lock import Locked
 from conda_gitenv.resolve import create_tracking_branches, tempdir
 from conda_gitenv import manifest_branch_prefix
+
+
+PKG_CACHE_NAME = '.pkg_cache'
 
 
 def tags_by_label(labels_directory):
@@ -42,7 +44,7 @@ def tags_by_env(repo):
     return tags
 
 
-def deploy_tag(repo, tag_name, target):
+def deploy_tag(repo, tag_name, target, api_user=None, api_key=None):
     tag = repo.tags[tag_name]
     # Checkout the tag in a detached head form.
     repo.head.reference = tag.commit
@@ -59,16 +61,40 @@ def deploy_tag(repo, tag_name, target):
         manifest = sorted(line.strip().split('\t') for line in fh)
 
     target = os.path.join(target, env_name, deployed_name)
-    create_env(repo, manifest, target)
+    create_env(repo, manifest, target, api_user=api_user, api_key=api_key)
 
 
-def create_env(repo, pkgs, target):
+def create_env(repo, pkgs, target, api_user=None, api_key=None):
+    try:
+        # Python3...
+        from urllib.parse import urlparse
+    except ImportError:
+        # Python2...
+        from urlparse import urlparse
+
     with Locked(target):
         spec_fname = os.path.join(repo.working_dir, 'env.spec')
         with open(spec_fname, 'r') as fh:
             spec = yaml.safe_load(fh)
 
-        channels = prioritize_channels(spec.get('channels', []))
+        channels = spec.get('channels', [])
+        if api_user and api_key:
+            # Inject the API user and key into the channel URLs...
+            for i, url in enumerate(channels):
+                parts = urlparse(url)
+                api_url = '{}://{}:{}@{}{}'.format(parts.scheme, api_user,
+                                                   api_key, parts.netloc,
+                                                   parts.path)
+                channels[i] = api_url
+            # Inject the API user and key into the manifest URLs...
+            for i, (url, _) in enumerate(pkgs):
+                parts = urlparse(url)
+                api_url = '{}://{}:{}@{}{}'.format(parts.scheme, api_user,
+                                                   api_key, parts.netloc,
+                                                   parts.path)
+                pkgs[i][0] = api_url
+
+        channels = prioritize_channels(channels)
         # Build reverse look-up from channel URL to channel name.
         channel_by_url = {url: channel for url, (channel, _) in channels.items()}
         index = fetch_index(channels, use_cache=False)
@@ -90,15 +116,18 @@ def create_env(repo, pkgs, target):
 def _patch_pkgs_dirs(func):
     @wraps(func)
     def wrapper(*args, **kwargs):
+        orig_pkgs_dirs = conda.base.context.Context.pkgs_dirs
+
         if len(args) >= 2:
             # Sniff the args to get the target deployment directory.
             target = args[1]
             # The associated target deployment custom package cache directory.
-            pkg_cache = os.path.join(target, '.pkg_cache')
+            pkg_cache = os.path.join(target, PKG_CACHE_NAME)
+
             @property
             def mocker(self):
                 return (pkg_cache,)
-            orig_pkgs_dirs = conda.base.context.Context.pkgs_dirs
+
             # Monkey patch the context pkgs_dirs property to override
             # it with our custom package cache directory.
             conda.base.context.Context.pkgs_dirs = mocker
@@ -114,7 +143,7 @@ def _patch_pkgs_dirs(func):
 
 
 @_patch_pkgs_dirs
-def deploy_repo(repo, target, desired_env_labels=None):
+def deploy_repo(repo, target, env_labels=None, api_user=None, api_key=None):
     env_tags = tags_by_env(repo)
 
     for branch in repo.branches:
@@ -137,16 +166,28 @@ def deploy_repo(repo, target, desired_env_labels=None):
 
             # Only deploy environments that match the given pattern.
             labelled_tags = {}
-            if desired_env_labels is None:
-                desired_env_labels = ['*']
+            if env_labels is None:
+                env_labels = ['*']
             for label, tag in all_labelled_tags.items():
-                if any([fnmatch.fnmatch('{}/{}'.format(branch.name, label),
-                                        env_label) for env_label in desired_env_labels]):
+                if any([fnmatch('{}/{}'.format(branch.name, label), env_label) for env_label in env_labels]):
                     labelled_tags[label] = tag
 
             for tag in set(labelled_tags.values()):
-                deploy_tag(repo, tag, target)
+                deploy_tag(repo, tag, target,
+                           api_user=api_user, api_key=api_key)
 
+            # Lock down the package cache files which may contain
+            # API credentials.
+            mode = stat.S_IRUSR | stat.S_IWUSR
+            pkg_cache_urls = os.path.join(target, PKG_CACHE_NAME, 'urls.txt')
+            if os.path.isfile(pkg_cache_urls):
+                os.chmod(pkg_cache_urls, mode)
+
+            pkg_cache_urls = os.path.splitext(pkg_cache_urls)[0]
+            if os.path.isfile(pkg_cache_urls):
+                os.chmod(pkg_cache_urls, mode)
+
+            mode = stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR
             for label, tag in labelled_tags.items():
                 with Locked(os.path.join(target, label)):
                     deployed_name = tag.split('-', 2)[2]
@@ -154,13 +195,21 @@ def deploy_repo(repo, target, desired_env_labels=None):
                     label_location = os.path.join(target, branch.name, label)
 
                     if os.path.exists(label_location):
-                        # Unix only:
                         if os.readlink(label_location) != label_target:
                             os.remove(label_location)
                    
                     if not os.path.exists(label_location):
-                        print('Linking {}/{} to {}'.format(branch.name, label, tag))
+                        msg = 'Linking {}/{} to {} ({})'
+                        print(msg.format(branch.name, label,
+                                         label_target, tag))
                         os.symlink(label_target, label_location)
+
+                    # Lock down the conda-meta directory, which may contain
+                    # API credentials.
+                    conda_meta = os.path.join(target, branch.name,
+                                              label_target, 'conda-meta')
+                    if os.path.isdir(conda_meta):
+                        os.chmod(conda_meta, mode)
 
 
 def configure_parser(parser):
@@ -169,6 +218,10 @@ def configure_parser(parser):
     parser.add_argument('--env_labels', nargs='+',  default=['*'], 
                         help='Pattern to match environment labels to. In the '
                              'form "{environment}/{label}".',)
+    parser.add_argument('--api_user', '-u', action='store',
+                        help='the API user')
+    parser.add_argument('--api_key', '-k', action='store',
+                        help='the API key')
     parser.set_defaults(function=handle_args)
     return parser
 
@@ -177,7 +230,8 @@ def handle_args(args):
     with tempdir() as repo_directory:
         repo = Repo.clone_from(args.repo_uri, repo_directory)
         create_tracking_branches(repo)
-        deploy_repo(repo, args.target, args.env_labels)
+        deploy_repo(repo, args.target, env_labels=args.env_labels,
+                    api_user=args.api_user, api_key=args.api_key)
 
 
 def main():
