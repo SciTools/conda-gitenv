@@ -50,13 +50,14 @@ def deploy_tag(repo, tag_name, target, api_user=None, api_key=None):
     repo.head.reference = tag.commit
     repo.head.reset(working_tree=True)
 
-    # Pull out the environment name from the form "env-<env_name>-<deployed_name>".
+    # Parse tag_name with form "env-<env_name>-<deployed_name>".
     env_name = tag_name.split('-')[1]
     deployed_name = tag_name.split('-', 2)[2]
 
     manifest_fname = os.path.join(repo.working_dir, 'env.manifest')
     if not os.path.exists(manifest_fname):
-        raise ValueError("The tag '{}' doesn't have a manifested environment.".format(tag_name))
+        msg = "The tag '{}' doesn't have a manifested environment."
+        raise ValueError(msg.format(tag_name))
     with open(manifest_fname, 'r') as fh:
         manifest = sorted(line.strip().split('\t') for line in fh)
 
@@ -96,20 +97,26 @@ def create_env(repo, pkgs, target, api_user=None, api_key=None):
 
         channels = prioritize_channels(channels)
         # Build reverse look-up from channel URL to channel name.
-        channel_by_url = {url: channel for url, (channel, _) in channels.items()}
+        channel_by_url = {url: channel
+                          for url, (channel, _) in channels.items()}
         index = fetch_index(channels, use_cache=False)
         resolver = Resolve(index)
         # Create the package distribution from the manifest. Ensure to replace
-        # channel-URLs with channel names, otherwise the fetch-extract may fail.
-        dists = [Dist.from_string(pkg, channel_override=channel_by_url.get(url, url)) for url, pkg in pkgs]
+        # channel-URLs with channel names, otherwise the fetch-extract may fail
+        dists = [Dist.from_string(pkg,
+                                  channel_override=channel_by_url.get(url,
+                                                                      url))
+                 for url, pkg in pkgs]
         # Use the resolver to sort packages into the appropriate dependency
         # order.
-        sorted_dists = resolver.dependency_sort({dist.name: dist for dist in dists})
+        sorted_dists = resolver.dependency_sort({dist.name: dist
+                                                 for dist in dists})
 
         pfe = ProgressiveFetchExtract(index, sorted_dists)
         pfe.execute()
         mkdir_p(target)
-        txn = UnlinkLinkTransaction.create_from_dists(index, target, (), sorted_dists)
+        txn = UnlinkLinkTransaction.create_from_dists(index, target, (),
+                                                      sorted_dists)
         txn.execute()
 
 
@@ -154,11 +161,12 @@ def deploy_repo(repo, target, env_labels=None, api_user=None, api_key=None):
             # skip this environment.
             if manifest_branch_name not in repo.branches:
                 continue
-            manifest_branch = repo.branches[manifest_branch_name]
             branch.checkout()
-            all_labelled_tags = tags_by_label(os.path.join(repo.working_dir, 'labels'))
+            all_labelled_tags = tags_by_label(os.path.join(repo.working_dir,
+                                                           'labels'))
 
-            # Create a latest tag that points to the most recently tagged environment.
+            # Create a latest tag that points to the most recently tagged
+            # environment.
             if env_tags.get(branch.name):
                 latest_tag = max(env_tags[branch.name],
                                  key=lambda t: t.commit.committed_date)
@@ -169,7 +177,10 @@ def deploy_repo(repo, target, env_labels=None, api_user=None, api_key=None):
             if env_labels is None:
                 env_labels = ['*']
             for label, tag in all_labelled_tags.items():
-                if any([fnmatch('{}/{}'.format(branch.name, label), env_label) for env_label in env_labels]):
+                item = '{}/{}'.format(branch.name, label)
+                match = [fnmatch(item, env_label)
+                         for env_label in env_labels]
+                if any(match):
                     labelled_tags[label] = tag
 
             for tag in set(labelled_tags.values()):
@@ -214,7 +225,7 @@ def deploy_repo(repo, target, env_labels=None, api_user=None, api_key=None):
 
 def configure_parser(parser):
     parser.add_argument('repo_uri', help='Repo to deploy.')
-    parser.add_argument('target', help='Location to deploy the environments to.')
+    parser.add_argument('target', help='Location to deploy the environments.')
     parser.add_argument('--env_labels', nargs='+',  default=['*'], 
                         help='Pattern to match environment labels to. In the '
                              'form "{environment}/{label}".',)
@@ -237,7 +248,8 @@ def handle_args(args):
 def main():
     import argparse
 
-    parser = argparse.ArgumentParser(description='Deploy the tracked environments.')
+    description = 'Deploy the tracked environments.'
+    parser = argparse.ArgumentParser(description=description)
     configure_parser(parser)
     args = parser.parse_args()
     return args.function(args)

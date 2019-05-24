@@ -30,8 +30,8 @@ from conda_gitenv import manifest_branch_prefix
 
 def resolve_spec(spec_fh, api_user, api_key):
     """
-    Given an open file handle to an env.spec, return a list of strings containing
-    '<channel_url>\t<pkg_name>' for each package resolved.
+    Given an open file handle to an env.spec, return a list of strings
+    containing '<channel_url>\t<pkg_name>' for each package resolved.
 
     """
     try:
@@ -49,7 +49,8 @@ def resolve_spec(spec_fh, api_user, api_key):
     if api_user and api_key:
         for i, url in enumerate(channels):
             parts = urlparse(url)
-            api_url = '{}://{}:{}@{}{}'.format(parts.scheme, api_user, api_key, parts.netloc, parts.path)
+            api_url = '{}://{}:{}@{}{}'.format(parts.scheme, api_user, api_key,
+                                               parts.netloc, parts.path)
             channels[i] = api_url
 
     index = conda.api.get_index(channels, prepend=False, use_cache=False)
@@ -60,8 +61,9 @@ def resolve_spec(spec_fh, api_user, api_key):
     pkgs = []
     for pkg in packages:
         pkg_info = index[pkg]
-        pkgs.append('\t'.join([os.path.join(pkg_info['schannel'], pkg_info['subdir']),
-                               pkg_info['fn'][:-len('.tar.bz2')]])), 
+        pkgs.append('\t'.join([os.path.join(pkg_info['schannel'],
+                                            pkg_info['subdir']),
+                               pkg_info['fn'][:-len('.tar.bz2')]]))
     return pkgs
 
 
@@ -114,7 +116,10 @@ def build_manifest_branches(repo, api_user=None, api_key=None, envs=None):
 
 @contextlib.contextmanager
 def tempdir(prefix='tmp'):
-    """A context manager for creating and then deleting a temporary directory."""
+    """
+    A context manager for creating and then deleting a temporary directory.
+
+    """
     tmpdir = tempfile.mkdtemp(prefix=prefix)
     try:
         yield tmpdir
@@ -140,7 +145,8 @@ def create_tracking_branches(repo):
 
 
 def configure_parser(parser):
-    parser.add_argument('repo_uri', help='Repo to use for environment tracking.')
+    msg = 'Repo to use for environment tracking.'
+    parser.add_argument('repo_uri', help=msg)
     parser.add_argument('--verbose', '-v', action='store_true')
     parser.add_argument('--api_user', '-u', action='store',
                         help='the API user')
@@ -165,7 +171,8 @@ def handle_args(args):
             for branch in repo.branches:
                 if branch.name.startswith(manifest_branch_prefix):
                     remote_branch = branch.tracking_branch()
-                    if remote_branch is None or branch.commit != remote_branch.commit:
+                    if (remote_branch is None or
+                            branch.commit != remote_branch.commit):
                         print('Pushing changes to {}'.format(branch.name))
                         repo.remotes.origin.push(branch)
 
@@ -173,7 +180,8 @@ def handle_args(args):
 def main():
     import argparse
 
-    parser = argparse.ArgumentParser(description='Track environment specifications using a git repo.')
+    description = 'Track environment specifications using a git repo.'
+    parser = argparse.ArgumentParser(description=description)
     configure_parser(parser)
     args = parser.parse_args()
     return args.function(args)
