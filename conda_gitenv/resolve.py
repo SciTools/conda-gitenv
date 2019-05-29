@@ -71,6 +71,9 @@ def build_manifest_branches(repo, api_user=None, api_key=None, envs=None):
     for remote in repo.remotes:
         remote.fetch()
 
+    if envs is None:
+        envs = ['*']
+
     for branch in repo.branches:
         name = branch.name
         if name.startswith(manifest_branch_prefix):
@@ -79,8 +82,6 @@ def build_manifest_branches(repo, api_user=None, api_key=None, envs=None):
             warnings.warn('Branch {} cannot be resolved as it contains at '
                           'least one "-" character.'.format(name))
             continue
-        if envs is None:
-            envs = ['*']
         if not any([fnmatch(name, env) for env in envs]):
             # Skip non-specific environments.
             continue
