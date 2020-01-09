@@ -44,7 +44,8 @@ def tags_by_env(repo):
     return tags
 
 
-def deploy_tag(repo, tag_name, target, api_user=None, api_key=None):
+def deploy_tag(repo, tag_name, target, api_user=None, api_key=None,
+               mirror=None):
     tag = repo.tags[tag_name]
     # Checkout the tag in a detached head form.
     repo.head.reference = tag.commit
@@ -61,11 +62,17 @@ def deploy_tag(repo, tag_name, target, api_user=None, api_key=None):
     with open(manifest_fname, 'r') as fh:
         manifest = sorted(line.strip().split('\t') for line in fh)
 
+    # Replace the channel URL with the mirror URL for each package
+    # entry specified in the manifest.
+    if mirror is not None:
+        manifest = [[mirror, pkg] for channel, pkg in manifest]
+
     target = os.path.join(target, env_name, deployed_name)
-    create_env(repo, manifest, target, api_user=api_user, api_key=api_key)
+    create_env(repo, manifest, target, api_user=api_user, api_key=api_key,
+               mirror=mirror)
 
 
-def create_env(repo, pkgs, target, api_user=None, api_key=None):
+def create_env(repo, pkgs, target, api_user=None, api_key=None, mirror=None):
     try:
         # Python3...
         from urllib.parse import urlparse
@@ -79,6 +86,12 @@ def create_env(repo, pkgs, target, api_user=None, api_key=None):
             spec = yaml.safe_load(fh)
 
         channels = spec.get('channels', [])
+
+        # Replace the channel/s specified in the environment specification
+        # with the mirror URL.
+        if mirror is not None:
+            channels = [mirror]
+
         if api_user and api_key:
             # Inject the API user and key into the channel URLs...
             for i, url in enumerate(channels):
@@ -150,7 +163,8 @@ def _patch_pkgs_dirs(func):
 
 
 @_patch_pkgs_dirs
-def deploy_repo(repo, target, env_labels=None, api_user=None, api_key=None):
+def deploy_repo(repo, target, env_labels=None, api_user=None, api_key=None,
+                mirror=None):
     env_tags = tags_by_env(repo)
 
     for branch in repo.branches:
@@ -185,7 +199,7 @@ def deploy_repo(repo, target, env_labels=None, api_user=None, api_key=None):
 
             for tag in set(labelled_tags.values()):
                 deploy_tag(repo, tag, target,
-                           api_user=api_user, api_key=api_key)
+                           api_user=api_user, api_key=api_key, mirror=mirror)
 
             # Lock down the package cache files which may contain
             # API credentials.
@@ -226,13 +240,15 @@ def deploy_repo(repo, target, env_labels=None, api_user=None, api_key=None):
 def configure_parser(parser):
     parser.add_argument('repo_uri', help='Repo to deploy.')
     parser.add_argument('target', help='Location to deploy the environments.')
-    parser.add_argument('--env_labels', nargs='+',  default=['*'], 
-                        help='Pattern to match environment labels to. In the '
-                             'form "{environment}/{label}".',)
-    parser.add_argument('--api_user', '-u', action='store',
-                        help='the API user')
     parser.add_argument('--api_key', '-k', action='store',
                         help='the API key')
+    parser.add_argument('--api_user', '-u', action='store',
+                        help='the API user')
+    parser.add_argument('--env_labels', nargs='+', default=['*'],
+                        help='Pattern to match environment labels to. In the '
+                             'form "{environment}/{label}".', )
+    parser.add_argument('--mirror', '-m', action='store',
+                        help='the replacement mirror channel URL')
     parser.set_defaults(function=handle_args)
     return parser
 
@@ -242,7 +258,8 @@ def handle_args(args):
         repo = Repo.clone_from(args.repo_uri, repo_directory)
         create_tracking_branches(repo)
         deploy_repo(repo, args.target, env_labels=args.env_labels,
-                    api_user=args.api_user, api_key=args.api_key)
+                    api_user=args.api_user, api_key=args.api_key,
+                    mirror=args.mirror)
 
 
 def main():

@@ -19,8 +19,8 @@ import shutil
 import tempfile
 import warnings
 
-import conda.resolve
 import conda.api
+import conda.resolve
 import conda_build_all.version_matrix
 from git import Repo
 import yaml
@@ -43,8 +43,8 @@ def resolve_spec(spec_fh, api_user, api_key):
 
     spec = yaml.safe_load(spec_fh)
     env_spec = spec.get('env', [])
-
     channels = spec.get('channels', [])
+
     # Inject the API user and key into the channel URLs...
     if api_user and api_key:
         for i, url in enumerate(channels):
@@ -148,13 +148,13 @@ def create_tracking_branches(repo):
 def configure_parser(parser):
     msg = 'Repo to use for environment tracking.'
     parser.add_argument('repo_uri', help=msg)
-    parser.add_argument('--verbose', '-v', action='store_true')
-    parser.add_argument('--api_user', '-u', action='store',
-                        help='the API user')
     parser.add_argument('--api_key', '-k', action='store',
                         help='the API key')
+    parser.add_argument('--api_user', '-u', action='store',
+                        help='the API user')
     parser.add_argument('--envs', '-e', nargs='+', default=['*'],
                         help='the environment names to resolve')
+    parser.add_argument('--verbose', '-v', action='store_true')
     parser.set_defaults(function=handle_args)
     return parser
 
