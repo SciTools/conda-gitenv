@@ -12,14 +12,15 @@ from __future__ import print_function
 
 import datetime
 import contextlib
+from fnmatch import fnmatch
 import logging
 import os
 import shutil
 import tempfile
 import warnings
 
-import conda.resolve
 import conda.api
+import conda.resolve
 import conda_build_all.version_matrix
 from git import Repo
 import yaml
@@ -27,15 +28,32 @@ import yaml
 from conda_gitenv import manifest_branch_prefix
 
 
-def resolve_spec(spec_fh):
+def resolve_spec(spec_fh, api_user, api_key):
     """
-    Given an open file handle to an env.spec, return a list of strings containing
-    '<channel_url>\t<pkg_name>' for each package resolved.
+    Given an open file handle to an env.spec, return a list of strings
+    containing '<channel_url>\t<pkg_name>' for each package resolved.
 
     """
+    try:
+        # Python3...
+        from urllib.parse import urlparse
+    except ImportError:
+        # Python2...
+        from urlparse import urlparse
+
     spec = yaml.safe_load(spec_fh)
     env_spec = spec.get('env', [])
-    index = conda.api.get_index(spec.get('channels', []), prepend=False, use_cache=False)
+    channels = spec.get('channels', [])
+
+    # Inject the API user and key into the channel URLs...
+    if api_user and api_key:
+        for i, url in enumerate(channels):
+            parts = urlparse(url)
+            api_url = '{}://{}:{}@{}{}'.format(parts.scheme, api_user, api_key,
+                                               parts.netloc, parts.path)
+            channels[i] = api_url
+
+    index = conda.api.get_index(channels, prepend=False, use_cache=False)
     resolver = conda.resolve.Resolve(index)
     packages = sorted(resolver.solve(env_spec),
                       key=lambda pkg: pkg.dist_name.lower())
@@ -43,14 +61,18 @@ def resolve_spec(spec_fh):
     pkgs = []
     for pkg in packages:
         pkg_info = index[pkg]
-        pkgs.append('\t'.join([pkg_info['channel'],
-                               pkg_info['fn'][:-len('.tar.bz2')]])), 
+        pkgs.append('\t'.join([os.path.join(pkg_info['schannel'],
+                                            pkg_info['subdir']),
+                               pkg_info['fn'][:-len('.tar.bz2')]]))
     return pkgs
 
 
-def build_manifest_branches(repo):
+def build_manifest_branches(repo, api_user=None, api_key=None, envs=None):
     for remote in repo.remotes:
         remote.fetch()
+
+    if envs is None:
+        envs = ['*']
 
     for branch in repo.branches:
         name = branch.name
@@ -60,13 +82,16 @@ def build_manifest_branches(repo):
             warnings.warn('Branch {} cannot be resolved as it contains at '
                           'least one "-" character.'.format(name))
             continue
+        if not any([fnmatch(name, env) for env in envs]):
+            # Skip non-specific environments.
+            continue
         branch.checkout()
         spec_fname = os.path.join(repo.working_dir, 'env.spec')
         if not os.path.exists(spec_fname):
             # Skip branches which don't have a spec.
             continue
         with open(spec_fname, 'r') as fh:
-            pkgs = resolve_spec(fh)
+            pkgs = resolve_spec(fh, api_user, api_key)
             # Cache the contents of the env.spec file from the source branch.
             fh.seek(0)
             spec_lines = fh.readlines()
@@ -92,7 +117,10 @@ def build_manifest_branches(repo):
 
 @contextlib.contextmanager
 def tempdir(prefix='tmp'):
-    """A context manager for creating and then deleting a temporary directory."""
+    """
+    A context manager for creating and then deleting a temporary directory.
+
+    """
     tmpdir = tempfile.mkdtemp(prefix=prefix)
     try:
         yield tmpdir
@@ -118,7 +146,14 @@ def create_tracking_branches(repo):
 
 
 def configure_parser(parser):
-    parser.add_argument('repo_uri', help='Repo to use for environment tracking.')
+    msg = 'Repo to use for environment tracking.'
+    parser.add_argument('repo_uri', help=msg)
+    parser.add_argument('--api_key', '-k', action='store',
+                        help='the API key')
+    parser.add_argument('--api_user', '-u', action='store',
+                        help='the API user')
+    parser.add_argument('--envs', '-e', nargs='+', default=['*'],
+                        help='the environment names to resolve')
     parser.add_argument('--verbose', '-v', action='store_true')
     parser.set_defaults(function=handle_args)
     return parser
@@ -132,11 +167,13 @@ def handle_args(args):
         with tempdir() as repo_directory:
             repo = Repo.clone_from(args.repo_uri, repo_directory)
             create_tracking_branches(repo)
-            build_manifest_branches(repo)
+            build_manifest_branches(repo, api_user=args.api_user,
+                                    api_key=args.api_key, envs=args.envs)
             for branch in repo.branches:
                 if branch.name.startswith(manifest_branch_prefix):
                     remote_branch = branch.tracking_branch()
-                    if remote_branch is None or branch.commit != remote_branch.commit:
+                    if (remote_branch is None or
+                            branch.commit != remote_branch.commit):
                         print('Pushing changes to {}'.format(branch.name))
                         repo.remotes.origin.push(branch)
 
@@ -144,7 +181,8 @@ def handle_args(args):
 def main():
     import argparse
 
-    parser = argparse.ArgumentParser(description='Track environment specifications using a git repo.')
+    description = 'Track environment specifications using a git repo.'
+    parser = argparse.ArgumentParser(description=description)
     configure_parser(parser)
     args = parser.parse_args()
     return args.function(args)
