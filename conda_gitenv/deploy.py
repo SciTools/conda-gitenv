@@ -65,7 +65,8 @@ def deploy_tag(repo, tag_name, target, api_user=None, api_key=None,
     # Replace the channel URL with the mirror URL for each package
     # entry specified in the manifest.
     if mirror is not None:
-        manifest = [[mirror, pkg] for channel, pkg in manifest]
+        manifest = [[os.path.join(mirror, os.path.basename(channel)), pkg]
+                    for channel, pkg in manifest]
 
     target = os.path.join(target, env_name, deployed_name)
     create_env(repo, manifest, target, api_user=api_user, api_key=api_key,
@@ -257,9 +258,17 @@ def handle_args(args):
     with tempdir() as repo_directory:
         repo = Repo.clone_from(args.repo_uri, repo_directory)
         create_tracking_branches(repo)
+
+        mirror = args.mirror
+        if mirror is not None and os.path.isdir(mirror):
+            # For convenience, add the "file" scheme to a raw directory
+            # to make it a well formed URL.
+            mirror = os.path.abspath(os.path.expanduser(mirror))
+            mirror = "file:/{}".format(os.path.normpath(mirror))
+
         deploy_repo(repo, args.target, env_labels=args.env_labels,
                     api_user=args.api_user, api_key=args.api_key,
-                    mirror=args.mirror)
+                    mirror=mirror)
 
 
 def main():
