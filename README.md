@@ -1,3 +1,9 @@
+This Repository is Deprecated
+-----------------------------
+
+Please note that this repository is now deprecated and unsupported.
+
+
 Track environment specifications using a git repo
 -------------------------------------------------
 
